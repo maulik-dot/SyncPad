@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 16mm 18mm;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #1e293b;
+            background: #ffffff;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .pdf-export-sheet {
+            width: 100%;
+            max-width: 816px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 0;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            color: #0f172a;
+            font-weight: 700;
+            line-height: 1.25;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        h1 { font-size: 24pt; margin: 18pt 0 8pt 0; }
+        h2 { font-size: 18pt; margin: 16pt 0 6pt 0; }
+        h3 { font-size: 14pt; margin: 14pt 0 5pt 0; }
+        h4 { font-size: 12pt; margin: 12pt 0 4pt 0; }
+
+        p {
+            margin: 0 0 8pt 0;
+            text-rendering: optimizeLegibility;
+        }
+
+        /* Links */
+        a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+
+        /* Inline Code */
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 9.5pt;
+            background-color: #f1f5f9;
+            padding: 1pt 3pt;
+            border-radius: 3pt;
+            color: #0f172a;
+        }
+
+        /* Authentic Code Snippet Box Card */
+        .pdf-code-card {
+            margin: 12pt 0;
+            background: #0f172a !important;
+            border: 1pt solid #1e293b !important;
+            border-radius: 6pt;
+            overflow: hidden;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            box-shadow: 0 2pt 6pt rgba(0, 0, 0, 0.12);
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pdf-code-topbar {
+            display: table !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 5.5pt 10pt !important;
+            background: #1e293b !important;
+            border-bottom: 1pt solid #334155 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pdf-code-dots {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            text-align: left !important;
+            width: 40pt !important;
+            white-space: nowrap !important;
+        }
+
+        .pdf-code-dots .dot {
+            display: inline-block !important;
+            width: 6pt !important;
+            height: 6pt !important;
+            border-radius: 50% !important;
+            margin-right: 3.5pt !important;
+            vertical-align: middle !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .pdf-code-dots .dot.red { background: #ef4444 !important; }
+        .pdf-code-dots .dot.yellow { background: #f59e0b !important; }
+        .pdf-code-dots .dot.green { background: #10b981 !important; }
+
+        .pdf-code-lang {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            text-align: right !important;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+            font-size: 7.5pt !important;
+            font-weight: 600 !important;
+            color: #94a3b8 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pdf-code-content {
+            margin: 0 !important;
+            padding: 10pt 14pt !important;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace !important;
+            font-size: 9pt !important;
+            line-height: 1.6 !important;
+            color: #f8fafc !important;
+            white-space: pre-wrap !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            background: #0f172a !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pdf-code-content code {
+            background: transparent !important;
+            padding: 0 !important;
+            color: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Blockquotes & Callouts */
+        blockquote {
+            margin: 12pt 0;
+            padding: 8pt 14pt;
+            border-left: 3.5pt solid #7c3aed;
+            background: #f8fafc;
+            color: #475569;
+            font-style: italic;
+            border-radius: 0 4pt 4pt 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .doc-callout {
+            position: relative !important;
+            display: block !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            margin: 12pt 0 !important;
+            padding: 9pt 14pt 9pt 36pt !important;
+            border-left: 4pt solid #3b82f6 !important;
+            background: #eff6ff !important;
+            border-radius: 0 6pt 6pt 0 !important;
+            color: #1e3a8a !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            font-size: 10pt !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .doc-callout-icon-cell {
+            position: absolute !important;
+            left: 12pt !important;
+            top: 9pt !important;
+            width: 16pt !important;
+            height: 16pt !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .doc-callout-content-cell {
+            display: block !important;
+            width: 100% !important;
+            line-height: 1.55 !important;
+            color: inherit !important;
+            word-break: break-word !important;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12pt 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            font-size: 10pt;
+        }
+
+        th, td {
+            border: 1pt solid #cbd5e1;
+            padding: 6.5pt 9pt;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: #0f172a;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Lists & Task Bullets */
+        ul, ol {
+            margin: 4pt 0 8pt 0;
+            padding-left: 18pt;
+        }
+
+        ul.checklist-list {
+            list-style: none !important;
+            padding-left: 0 !important;
+            margin: 6pt 0 !important;
+        }
+
+        li {
+            margin-bottom: 3.5pt;
+        }
+
+        li.checklist-item {
+            list-style: none !important;
+            position: relative !important;
+            display: block !important;
+            width: 100% !important;
+            padding-left: 20pt !important;
+            margin: 0 0 4.5pt 0 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            min-height: 14pt !important;
+        }
+
+        .checklist-box-cell {
+            position: absolute !important;
+            left: 0 !important;
+            top: 1.5pt !important;
+            width: 14pt !important;
+            height: 14pt !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            vertical-align: top !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .checklist-box {
+            width: 12.5pt !important;
+            height: 12.5pt !important;
+            border: 1.5pt solid #cbd5e1 !important;
+            border-radius: 3pt !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #ffffff !important;
+            color: #ffffff !important;
+            vertical-align: top !important;
+            box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .checklist-box.checked {
+            background-color: #7c3aed !important;
+            border-color: #7c3aed !important;
+            color: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .checklist-text-cell {
+            display: block !important;
+            vertical-align: top !important;
+            width: 100% !important;
+            line-height: 1.5 !important;
+            color: inherit !important;
+            word-break: break-word !important;
+        }
+
+        .checklist-text-cell.strikethrough {
+            text-decoration: line-through !important;
+            text-decoration-color: #8b5cf6 !important;
+            color: #94a3b8 !important;
+        }
+
+        /* Images */
+        .pdf-image-container {
+            margin: 12pt 0;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+
+        .pdf-image-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4pt;
+            border: 1pt solid #e2e8f0;
+            box-shadow: 0 1pt 3pt rgba(0,0,0,0.05);
+        }
+
+        .pdf-image-caption {
+            font-size: 9pt;
+            color: #64748b;
+            margin-top: 4pt;
+            font-style: italic;
+        }
+
+        /* Horizontal Rules */
+        hr {
+            border: none;
+            border-top: 1pt solid #e2e8f0;
+            margin: 14pt 0;
+        }
+
+        /* Page Breaks */
+        .pdf-page-break {
+            page-break-before: always !important;
+            break-before: page !important;
+            page-break-after: avoid !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            display: block !important;
+            clear: both !important;
+        }
+
+        /* Math / LaTeX */
+        .doc-latex-card {
+            margin: 12pt 0;
+            padding: 0;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0;
+            text-align: center;
+            page-break-inside: avoid;
+            box-shadow: none !important;
+            font-size: 1.15em;
+        }
+
+        .doc-latex-card.is-floating {
+            position: absolute !important;
+            margin: 0 !important;
+            text-align: left;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="pdf-export-sheet">
+        <div class="doc-callout" style="border-left-color: #3b82f6 !important; background-color: #eff6ff !important;">
+                    <span class="doc-callout-icon-cell">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </span>
+                    <span class="doc-callout-content-cell"><strong><span style="color: #1e3a8a;">Note:</span></strong><span style="color: #1e3a8a;"> This is an important callout with longer text that should stay on the same line as the icon.</span></span>
+                </div><div class="pdf-code-card">
+                    <div class="pdf-code-topbar">
+                        <div class="pdf-code-dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="pdf-code-lang">JAVASCRIPT</div>
+                    </div>
+                    <pre class="pdf-code-content"><code>function hello() {
+    console.log(&quot;Hello World&quot;);
+    return true;
+}</code></pre>
+                </div><ul class="checklist-list"><li class="checklist-item"><span class="checklist-box-cell"><span class="checklist-box checked"><svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"></polyline></svg></span></span><span class="checklist-text-cell strikethrough"><span>Task 1: Complete quarterly review</span></span></li><li class="checklist-item"><span class="checklist-box-cell"><span class="checklist-box"></span></span><span class="checklist-text-cell "><span>Task 2: Prepare slides for Monday</span></span></li><li class="checklist-item"><span class="checklist-box-cell"><span class="checklist-box checked"><svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"></polyline></svg></span></span><span class="checklist-text-cell strikethrough"><span>Task 3: Send out invitations</span></span></li><li class="checklist-item"><span class="checklist-box-cell"><span class="checklist-box"></span></span><span class="checklist-text-cell "><span>Task 4: Review pull requests</span></span></li></ul><p><span>Normal paragraph text for comparison.</span></p>
+    </div>
+</body>
+</html>

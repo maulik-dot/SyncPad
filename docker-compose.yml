@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: syncpad_postgres
+    environment:
+      POSTGRES_DB: syncpad_db
+      POSTGRES_USER: syncpad_user
+      POSTGRES_PASSWORD: syncpad_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncpad_user -d syncpad_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: syncpad_app
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/syncpad_db
+      SPRING_DATASOURCE_USERNAME: syncpad_user
+      SPRING_DATASOURCE_PASSWORD: syncpad_password
+      JWT_SECRET: 73789020547b7d090d16079f90902f3a2e6797863028881d457018830c7b9953
+      JWT_EXPIRATION: 86400000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,0 +1,10 @@
+{
+  "description": "Streamline document management with customizable workspaces designed for users to organize, collaborate, and enhance productivity efficiently.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
