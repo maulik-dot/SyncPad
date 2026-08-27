@@ -1,288 +1,899 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useAuth } from './context/AuthContext'
+import { documentService } from './services/documentService'
+import { folderService } from './services/folderService'
+import { workspaceService } from './services/workspaceService'
+import { wsService } from './services/websocketService'
+import type { Document, Folder, Workspace, DocumentVersion, DocumentComment, DocumentEditMessage, FileType, Role } from './types/api'
 
-type TreeNode = {
-  id: string
-  name: string
-  count: number
-  children?: TreeNode[]
+interface WorkspaceScreenProps {
+  workspaceId?: string | number
+  documentId?: string | number
+  onHome: () => void
 }
 
-type FolderCard = {
-  id: string
-  name: string
-  fileCount: number
-  sources: string[]
-  docPreviews: string[]
-}
+export default function WorkspaceScreen({ workspaceId, documentId: initialDocId, onHome }: WorkspaceScreenProps) {
+  const { user } = useAuth()
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null)
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [activeDoc, setActiveDoc] = useState<Document | null>(null)
 
-type FileRow = {
-  id: string
-  name: string
-  type: 'pdf' | 'doc' | 'sheet' | 'notion'
-  added: string
-  addedBy: string
-  avatarColor: string
-}
+  // Document Editor states
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [versions, setVersions] = useState<DocumentVersion[]>([])
+  const [comments, setComments] = useState<DocumentComment[]>([])
+  const [newCommentText, setNewCommentText] = useState('')
+  const [replyParentId, setReplyParentId] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<'editor' | 'versions' | 'comments'>('editor')
+  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Unsaved changes'>('Saved')
+  const [activeCollaborators, setActiveCollaborators] = useState<string[]>([])
+  
+  // Modals
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareRole, setShareRole] = useState<Role>('EDITOR')
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareLinkUrl, setShareLinkUrl] = useState<string | null>(null)
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false)
+  const [showNewDocModal, setShowNewDocModal] = useState(false)
+  const [showMembersModal, setShowMembersModal] = useState(false)
+  const [members, setMembers] = useState<any[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<Role>('EDITOR')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newDocTitle, setNewDocTitle] = useState('')
+  const [newDocType, setNewDocType] = useState<FileType>('DOC')
+  const [loading, setLoading] = useState(true)
 
-const TREE: TreeNode[] = [
-  {
-    id: 'gk', name: 'General Knowledge', count: 10,
-    children: [
-      {
-        id: 'ob', name: 'Onboarding', count: 3,
-        children: [
-          { id: 'sf1', name: 'Subfolder 1', count: 5 },
-          { id: 'sf2', name: 'Subfolder 2', count: 10 },
-        ]
-      },
-      { id: 'int', name: 'Integrations', count: 7 },
-      { id: 'docs', name: 'Documents', count: 14 },
-    ]
-  },
-  { id: 'od', name: 'Onboarding Design', count: 22 },
-  { id: 'ti', name: 'Team Interviews', count: 8 },
-  { id: 'rsch', name: 'Research', count: 17 },
-  { id: 'eng', name: 'Engineering', count: 31 },
-]
+  const isLocalUpdate = useRef(false)
+  const saveTimeout = useRef<any>(null)
+  const titleTimeout = useRef<any>(null)
 
-const FOLDER_CARDS: FolderCard[] = [
-  { id: 'ob', name: 'Onboarding', fileCount: 15, sources: ['gdrive', 'notion'], docPreviews: ['pdf', 'doc', 'doc'] },
-  { id: 'int2', name: 'Integrations', fileCount: 5, sources: ['notion', 'linear', 'gdrive'], docPreviews: ['doc', 'sheet'] },
-  { id: 'docs2', name: 'Documents', fileCount: 14, sources: ['gdrive'], docPreviews: ['pdf', 'pdf', 'doc'] },
-  { id: 'od2', name: 'Onboarding Design', fileCount: 22, sources: ['notion', 'gdrive'], docPreviews: ['doc', 'sheet', 'pdf'] },
-]
+  // 1. Initial Load: Workspaces, Folders, and Documents
+  const loadWorkspaceData = async () => {
+    setLoading(true)
+    try {
+      const wsList = await workspaceService.getWorkspaces().catch(() => [] as Workspace[])
+      setWorkspaces(wsList)
 
-const FILES: FileRow[] = [
-  { id: 'f1', name: 'Onboarding Guidelines 2026', type: 'pdf', added: 'Aug 11, 2026', addedBy: 'M', avatarColor: '#5b7fa6' },
-  { id: 'f2', name: 'Integration Setup Checklist', type: 'notion', added: 'Aug 9, 2026', addedBy: 'J', avatarColor: '#7a6fa6' },
-  { id: 'f3', name: 'Team Org Chart — Q3', type: 'sheet', added: 'Aug 7, 2026', addedBy: 'A', avatarColor: '#4a9068' },
-  { id: 'f4', name: 'Product Roadmap Draft', type: 'doc', added: 'Aug 5, 2026', addedBy: 'R', avatarColor: '#a06060' },
-  { id: 'f5', name: 'Design System Overview', type: 'pdf', added: 'Aug 3, 2026', addedBy: 'T', avatarColor: '#8a7050' },
-  { id: 'f6', name: 'API Reference v3', type: 'doc', added: 'Jul 30, 2026', addedBy: 'M', avatarColor: '#5b7fa6' },
-]
-
-function FolderIcon({ open = false, className = '' }: { open?: boolean; className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="none">
-      {open
-        ? <path d="M1 4.5C1 3.67 1.67 3 2.5 3H6l1.5 1.5H13.5C14.33 4.5 15 5.17 15 6v6.5C15 13.33 14.33 14 13.5 14h-11C1.67 14 1 13.33 1 12.5V4.5Z" fill="currentColor" opacity=".9"/>
-        : <path d="M1 4.5C1 3.67 1.67 3 2.5 3H6l1.5 1.5H13.5C14.33 4.5 15 5.17 15 6v6.5C15 13.33 14.33 14 13.5 14h-11C1.67 14 1 13.33 1 12.5V4.5Z" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+      let targetWs: Workspace | null = null
+      if (workspaceId) {
+        targetWs = wsList.find(w => String(w.id) === String(workspaceId) || w.name === String(workspaceId)) || null
       }
-    </svg>
-  )
-}
+      if (!targetWs && wsList.length > 0) {
+        targetWs = wsList[0]
+      }
+      setCurrentWorkspace(targetWs)
 
-function FileTypeIcon({ type }: { type: FileRow['type'] }) {
-  const map: Record<FileRow['type'], { bg: string; label: string }> = {
-    pdf:    { bg: '#e53e3e', label: 'PDF' },
-    doc:    { bg: '#3182ce', label: 'DOC' },
-    sheet:  { bg: '#38a169', label: 'XLS' },
-    notion: { bg: '#ffffff', label: 'N' },
-  }
-  const { bg, label } = map[type]
-  return (
-    <span className="inline-flex items-center justify-center w-7 h-7 rounded text-[9px] font-bold shrink-0"
-      style={{ background: bg, color: type === 'notion' ? '#111' : '#fff' }}>
-      {label}
-    </span>
-  )
-}
+      const wsName = targetWs ? targetWs.name : undefined
+      const [folderList, docList] = await Promise.all([
+        folderService.getFolders(wsName).catch(() => [] as Folder[]),
+        documentService.getDocuments({ workspace: wsName }).catch(() => [] as Document[])
+      ])
 
-function SourceBadge({ src }: { src: string }) {
-  if (src === 'gdrive') return (
-    <span className="w-6 h-6 rounded-full bg-[#2a2a2a] border border-[#333] inline-flex items-center justify-center text-[10px]" title="Google Drive">🔵</span>
-  )
-  if (src === 'notion') return (
-    <span className="w-6 h-6 rounded-full bg-white border border-[#333] inline-flex items-center justify-center text-[10px] font-bold text-black" title="Notion">N</span>
-  )
-  if (src === 'linear') return (
-    <span className="w-6 h-6 rounded-full bg-[#5e6ad2] border border-[#333] inline-flex items-center justify-center text-[10px] text-white font-bold" title="Linear">L</span>
-  )
-  return null
-}
+      setFolders(folderList)
+      setDocuments(docList)
 
-function TreeItem({ node, depth, activeId, onSelect, expanded, onToggle }: {
-  node: TreeNode; depth: number; activeId: string
-  onSelect: (id: string) => void; expanded: Set<string>; onToggle: (id: string) => void
-}) {
-  const isOpen = expanded.has(node.id)
-  const isActive = activeId === node.id
-  const hasChildren = (node.children?.length ?? 0) > 0
-
-  return (
-    <div>
-      <div
-        className={`flex items-center gap-2 py-1.5 px-2 rounded-md cursor-pointer select-none group transition-colors ${isActive ? 'bg-[#2a2a2a]' : 'hover:bg-[#1e1e1e]'}`}
-        style={{ paddingLeft: `${8 + depth * 20}px` }}
-        onClick={() => { onSelect(node.id); if (hasChildren) onToggle(node.id) }}
-      >
-        <FolderIcon open={isOpen && hasChildren} className={isActive ? 'text-white' : 'text-[#666]'} />
-        <span className={`flex-1 text-sm truncate ${isActive ? 'text-white font-medium' : 'text-[#999] group-hover:text-white'}`}>{node.name}</span>
-        <span className="text-[11px] text-[#555] bg-[#222] px-1.5 py-0.5 rounded font-medium shrink-0">{node.count}</span>
-      </div>
-      {isOpen && node.children && (
-        <div className="relative">
-          <div className="absolute top-0 bottom-0 border-l border-[#2a2a2a]" style={{ left: `${8 + depth * 20 + 7}px` }} />
-          {node.children.map(child => (
-            <TreeItem key={child.id} node={child} depth={depth + 1} activeId={activeId} onSelect={onSelect} expanded={expanded} onToggle={onToggle} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FolderCardItem({ card }: { card: FolderCard }) {
-  return (
-    <div className="bg-[#1e1e1e] rounded-xl overflow-hidden cursor-pointer hover:bg-[#252525] transition-colors group border border-[#2a2a2a] hover:border-[#333]">
-      <div className="h-36 bg-[#262626] relative flex items-end px-4 pb-3 overflow-hidden">
-        <div className="flex items-end gap-1.5 absolute bottom-4 left-4">
-          {card.docPreviews.map((type, i) => (
-            <div key={i} className="rounded-md bg-[#333] border border-[#3a3a3a] flex items-center justify-center"
-              style={{ width: i === 0 ? 44 : 36, height: i === 0 ? 56 : 46, transform: `rotate(${(i - 1) * 4}deg)`, zIndex: card.docPreviews.length - i, position: 'relative' }}>
-              {type === 'pdf' && <span className="text-[8px] font-bold text-[#e53e3e]">PDF</span>}
-              {type === 'doc' && <span className="text-[8px] font-bold text-[#3182ce]">DOC</span>}
-              {type === 'sheet' && <span className="text-[8px] font-bold text-[#38a169]">XLS</span>}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-[#2a2a2a]">
-        {card.sources.map((src, i) => <SourceBadge key={i} src={src} />)}
-      </div>
-      <div className="px-4 py-3">
-        <p className="text-[15px] font-semibold text-white">{card.name}</p>
-        <p className="text-xs text-[#555] mt-0.5">{card.fileCount} Files</p>
-      </div>
-    </div>
-  )
-}
-
-export default function WorkspaceScreen({ onHome }: { onHome: () => void }) {
-  const [activeId, setActiveId] = useState('gk')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['gk', 'ob']))
-  const [search, setSearch] = useState('')
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+      if (initialDocId) {
+        const found = docList.find(d => String(d.id) === String(initialDocId))
+        if (found) {
+          await selectDocument(found.id)
+        } else {
+          await selectDocument(initialDocId)
+        }
+      } else if (docList.length > 0) {
+        await selectDocument(docList[0].id)
+      }
+    } catch (err) {
+      console.error('Failed to load workspace data', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const filteredFiles = FILES.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
+  useEffect(() => {
+    loadWorkspaceData()
+  }, [workspaceId, initialDocId])
+
+  // 2. Select and Load Document Details
+  const selectDocument = async (id: number | string) => {
+    try {
+      const detail = await documentService.getDocumentDetail(id)
+      const docObj: Document = {
+        id: detail.id,
+        title: detail.title,
+        content: detail.content,
+        fileType: detail.fileType,
+        folderId: detail.folderId,
+        owner: {
+          id: detail.ownerId || 0,
+          name: detail.ownerName || 'Unknown',
+          email: detail.ownerEmail || 'unknown@syncpad.com'
+        },
+        currentUserRole: detail.currentUserRole,
+        createdAt: detail.createdAt,
+        updatedAt: detail.updatedAt,
+      }
+      setActiveDoc(docObj)
+      setTitle(detail.title)
+      setContent(detail.content || '')
+      setVersions(detail.versions || [])
+      setComments(detail.comments || [])
+      setShareLinkUrl(null)
+    } catch (e) {
+      console.error('Failed to load document details', e)
+    }
+  }
+
+  // 3. Connect to STOMP WebSocket for real-time collaboration
+  useEffect(() => {
+    if (!activeDoc?.id) return
+    const numId = Number(activeDoc.id)
+    if (isNaN(numId)) return
+
+    wsService.connect(
+      numId,
+      (msg: DocumentEditMessage) => {
+        if (msg.senderEmail && msg.senderEmail === user?.email) {
+          return
+        }
+
+        if (msg.type === 'EDIT') {
+          if (msg.content !== undefined) {
+            isLocalUpdate.current = true
+            setContent(msg.content)
+          }
+          if (msg.title !== undefined) {
+            setTitle(msg.title)
+          }
+        } else if (msg.type === 'SAVED') {
+          setSaveStatus('Saved')
+          documentService.getVersions(numId).then(setVersions).catch(() => {})
+        } else if (msg.type === 'PRESENCE') {
+          if (msg.senderName && !activeCollaborators.includes(msg.senderName)) {
+            setActiveCollaborators(prev => [...new Set([...prev, msg.senderName!])])
+          }
+        }
+      }
+    )
+
+    return () => {
+      wsService.disconnect()
+    }
+  }, [activeDoc?.id, user?.email])
+
+  // 4. Handle Content Changes (Debounced Autosave + WebSocket Broadcast)
+  const handleContentChange = (newText: string) => {
+    setContent(newText)
+    setSaveStatus('Saving...')
+
+    if (!activeDoc?.id) return
+    const numId = Number(activeDoc.id)
+
+    wsService.sendEdit(title, newText, user?.name || user?.email)
+
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        if (!isNaN(numId)) {
+          wsService.sendSave(title, newText, user?.name || user?.email)
+        }
+        // Always confirm persistence via REST endpoint for guaranteed durability
+        await documentService.updateDocument(activeDoc.id, { title, content: newText })
+        setSaveStatus('Saved')
+      } catch (err) {
+        console.error('Save failed', err)
+        setSaveStatus('Unsaved changes')
+      }
+    }, 1500)
+  }
+
+  // Debounced Title Changes
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle)
+    if (!activeDoc?.id) return
+    wsService.sendEdit(newTitle, content, user?.name || user?.email)
+
+    if (titleTimeout.current) clearTimeout(titleTimeout.current)
+    titleTimeout.current = setTimeout(async () => {
+      try {
+        await documentService.renameDocument(activeDoc.id, newTitle)
+        setDocuments(prev => prev.map(d => d.id === activeDoc.id ? { ...d, title: newTitle } : d))
+      } catch (e) {
+        console.error(e)
+      }
+    }, 800)
+  }
+
+  // 5. Create Folder
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newFolderName.trim()) return
+    try {
+      const folder = await folderService.createFolder({
+        name: newFolderName.trim(),
+        workspaceName: currentWorkspace?.name || undefined,
+        parentFolderId: selectedFolder?.id
+      })
+      setFolders(prev => [...prev, folder])
+      setNewFolderName('')
+      setShowNewFolderModal(false)
+    } catch (err: any) {
+      alert(err.message || 'Failed to create folder')
+    }
+  }
+
+  // 6. Create Document / File
+  const handleCreateDocument = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newDocTitle.trim()) return
+    try {
+      const created = await documentService.createDocument({
+        title: newDocTitle.trim(),
+        fileType: newDocType,
+        folderId: selectedFolder?.id,
+        workspaceName: currentWorkspace?.name || undefined
+      })
+      setDocuments(prev => [created, ...prev])
+      setNewDocTitle('')
+      setShowNewDocModal(false)
+      await selectDocument(created.id)
+    } catch (err: any) {
+      alert(err.message || 'Failed to create document')
+    }
+  }
+
+  // 7. Delete Document
+  const handleDeleteDocument = async () => {
+    if (!activeDoc?.id) return
+    if (!confirm(`Are you sure you want to delete '${activeDoc.title}'?`)) return
+    try {
+      await documentService.deleteDocument(activeDoc.id)
+      setDocuments(prev => prev.filter(d => d.id !== activeDoc.id))
+      setActiveDoc(null)
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete document')
+    }
+  }
+
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!activeDoc?.id) return
+    try {
+      setLoading(true)
+      const restored = await documentService.restoreVersion(activeDoc.id, versionNumber)
+      setContent(restored.content || '')
+      setTitle(restored.title)
+      wsService.sendEdit(restored.title, restored.content || '', user?.name || user?.email)
+      const newVers = await documentService.getVersions(activeDoc.id)
+      setVersions(newVers)
+      setActiveTab('editor')
+    } catch (e) {
+      console.error('Restore failed', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCommentText.trim() || !activeDoc?.id) return
+    try {
+      const added = await documentService.addComment(
+        activeDoc.id, 
+        newCommentText.trim(),
+        undefined,
+        replyParentId || undefined
+      )
+      setComments(prev => [added, ...prev])
+      setNewCommentText('')
+      setReplyParentId(null)
+    } catch (e: any) {
+      alert(e.message || 'Failed to add comment')
+    }
+  }
+
+  const handleResolveComment = async (commentId: number) => {
+    if (!activeDoc?.id) return
+    try {
+      const updated = await documentService.resolveComment(activeDoc.id, commentId)
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, resolved: updated.resolved } : c))
+    } catch (e: any) {
+      alert(e.message || 'Failed to update comment')
+    }
+  }
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!activeDoc?.id) return
+    try {
+      await documentService.deleteComment(activeDoc.id, commentId)
+      setComments(prev => prev.filter(c => c.id !== commentId))
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete comment')
+    }
+  }
+
+  const handleShare = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!shareEmail.trim() || !activeDoc?.id) return
+    try {
+      await documentService.shareDocument(activeDoc.id, shareEmail.trim(), shareRole)
+      alert(`Shared document with ${shareEmail} as ${shareRole}`)
+      setShareEmail('')
+    } catch (err: any) {
+      alert(err.message || 'Share failed')
+    }
+  }
+
+  const handleGenerateShareLink = async () => {
+    if (!activeDoc?.id) return
+    try {
+      const res = await documentService.generateShareLink(activeDoc.id, 'VIEWER', 7)
+      setShareLinkUrl(window.location.origin + res.url)
+    } catch (err: any) {
+      alert(err.message || 'Failed to generate link')
+    }
+  }
+
+  const handleOpenMembers = async () => {
+    if (!currentWorkspace?.id) return
+    try {
+      const mList = await workspaceService.getMembers(currentWorkspace.id)
+      setMembers(mList)
+      setShowMembersModal(true)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!inviteEmail.trim() || !currentWorkspace?.id) return
+    try {
+      await workspaceService.inviteMember(currentWorkspace.id, inviteEmail.trim(), inviteRole)
+      alert(`Invitation sent to ${inviteEmail}`)
+      setInviteEmail('')
+      const mList = await workspaceService.getMembers(currentWorkspace.id)
+      setMembers(mList)
+    } catch (err: any) {
+      alert(err.message || 'Invite failed')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#111] flex items-center justify-center text-white text-sm">
+        Loading workspace...
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#111111]">
-      {/* Sidebar */}
-      <aside className="w-[260px] shrink-0 flex flex-col bg-[#111111] border-r border-[#1e1e1e] overflow-hidden">
-        <div className="px-4 pt-4 pb-4 border-b border-[#1e1e1e]">
-          {/* Back to Home */}
+    <div className="min-h-screen bg-[#111] flex flex-col text-white">
+      {/* Top Navbar */}
+      <header className="h-14 border-b border-[#222] flex items-center justify-between px-6 bg-[#161616] shrink-0">
+        <div className="flex items-center gap-4">
           <button
             onClick={onHome}
-            className="flex items-center gap-1.5 text-[#555] hover:text-white transition-colors mb-3 group"
+            className="flex items-center gap-1.5 text-xs text-[#888] hover:text-white transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-xs font-medium">Home</span>
+            ← Home
           </button>
-
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#2a2a2a] border border-[#333] flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">W</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-white truncate">Wintermute Studio</p>
-              <p className="text-[10px] text-[#444] truncate">5 members</p>
-            </div>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#444] shrink-0">
-              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+          <div className="h-4 w-[1px] bg-[#333]" />
+          <div className="flex items-center gap-2">
+            <span 
+              onClick={handleOpenMembers}
+              className="text-xs font-semibold px-2 py-0.5 rounded bg-[#252525] text-blue-400 cursor-pointer hover:bg-[#303030] transition-colors"
+              title="Click to view workspace members"
+            >
+              {currentWorkspace?.name || 'Workspace'} 👥
+            </span>
+            {activeDoc && (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-white outline-none border-b border-transparent focus:border-[#444] px-1 transition-colors"
+                placeholder="Untitled Document"
+              />
+            )}
           </div>
         </div>
 
-        <div className="px-3 pt-3 pb-2">
-          <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#444]" width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M10 10l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-8 pl-7 pr-3 text-xs bg-[#1a1a1a] border border-[#252525] rounded-lg text-white placeholder:text-[#444] outline-none focus:border-[#333] transition-colors" />
-          </div>
-        </div>
+        <div className="flex items-center gap-3">
+          {activeDoc && <span className="text-[11px] text-[#666]">{saveStatus}</span>}
 
-        <nav className="flex-1 overflow-y-auto px-2 pt-1 pb-4">
-          {TREE.map(node => (
-            <TreeItem key={node.id} node={node} depth={0} activeId={activeId} onSelect={setActiveId} expanded={expanded} onToggle={toggleExpand} />
-          ))}
-        </nav>
-
-        <div className="px-4 py-3 border-t border-[#1e1e1e] flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-[#5b7fa6] flex items-center justify-center text-white text-xs font-semibold shrink-0">M</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-white truncate">Mara Jensen</p>
-            <p className="text-[10px] text-[#444] truncate">Admin</p>
-          </div>
-          <button className="text-[#444] hover:text-[#888] transition-colors">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="2.5" r="1" fill="currentColor"/>
-              <circle cx="7" cy="7" r="1" fill="currentColor"/>
-              <circle cx="7" cy="11.5" r="1" fill="currentColor"/>
-            </svg>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-y-auto bg-[#111111]">
-        <div className="max-w-5xl mx-auto px-8 py-8">
-          <div className="flex items-center justify-between mb-7">
-            <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">General Knowledge</h1>
-              <p className="text-sm text-[#555] mt-0.5">10 items · Last updated Aug 11</p>
+          {activeCollaborators.length > 0 && (
+            <div className="flex items-center gap-1">
+              {activeCollaborators.map((c, i) => (
+                <div
+                  key={i}
+                  title={`Collaborator: ${c}`}
+                  className="w-6 h-6 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#111]"
+                >
+                  {c[0].toUpperCase()}
+                </div>
+              ))}
             </div>
-            <button className="flex items-center gap-2 h-9 px-4 rounded-lg bg-white text-[#111] text-sm font-semibold hover:bg-[#eee] transition-colors">
-              <span className="text-lg leading-none">+</span> Add files
+          )}
+
+          {activeDoc && (
+            <div className="flex bg-[#222] rounded-lg p-0.5 border border-[#333]">
+              <button
+                onClick={() => setActiveTab('editor')}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  activeTab === 'editor' ? 'bg-[#333] text-white' : 'text-[#888] hover:text-white'
+                }`}
+              >
+                Editor
+              </button>
+              <button
+                onClick={() => setActiveTab('versions')}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  activeTab === 'versions' ? 'bg-[#333] text-white' : 'text-[#888] hover:text-white'
+                }`}
+              >
+                History ({versions.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('comments')}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  activeTab === 'comments' ? 'bg-[#333] text-white' : 'text-[#888] hover:text-white'
+                }`}
+              >
+                Comments ({comments.length})
+              </button>
+            </div>
+          )}
+
+          {activeDoc && (
+            <>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+              >
+                Share
+              </button>
+              <button
+                onClick={handleDeleteDocument}
+                className="h-8 px-2.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"
+                title="Delete Document"
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Main Layout: Sidebar & Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar: Folders and Documents */}
+        <aside className="w-64 bg-[#141414] border-r border-[#222] flex flex-col shrink-0">
+          {/* Folders header */}
+          <div className="p-3 border-b border-[#222] flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#666] uppercase tracking-wider">Folders</span>
+            <button
+              onClick={() => setShowNewFolderModal(true)}
+              className="text-xs text-[#888] hover:text-white px-2 py-0.5 rounded bg-[#222] transition-colors"
+              title="Create new folder"
+            >
+              + Folder
             </button>
           </div>
 
-          <section className="mb-10">
-            <h2 className="text-lg font-bold text-white mb-4">Folders</h2>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {FOLDER_CARDS.map(card => <FolderCardItem key={card.id} card={card} />)}
-            </div>
-          </section>
+          {/* Folders List */}
+          <div className="p-2 space-y-1 overflow-y-auto max-h-48 border-b border-[#222]">
+            <button
+              onClick={() => setSelectedFolder(null)}
+              className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 transition-colors ${
+                selectedFolder === null ? 'bg-[#252525] text-white font-medium' : 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'
+              }`}
+            >
+              <span>📁</span>
+              <span className="truncate">All Files & Documents</span>
+            </button>
+            {folders.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setSelectedFolder(f)}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 transition-colors ${
+                  selectedFolder?.id === f.id ? 'bg-[#252525] text-white font-medium' : 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'
+                }`}
+              >
+                <span>📂</span>
+                <span className="truncate">{f.name}</span>
+              </button>
+            ))}
+            {folders.length === 0 && (
+              <p className="text-[11px] text-[#555] px-2 py-1">No folders yet</p>
+            )}
+          </div>
 
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Files</h2>
-              <div className="flex gap-2">
-                <button className="h-8 px-3 rounded-lg border border-[#252525] bg-[#1a1a1a] text-[#666] text-xs hover:text-white hover:border-[#333] transition-colors">Sort</button>
-                <button className="h-8 px-3 rounded-lg border border-[#252525] bg-[#1a1a1a] text-[#666] text-xs hover:text-white hover:border-[#333] transition-colors">Filter</button>
-              </div>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-[#1e1e1e]">
-              <div className="flex items-center px-5 py-3 bg-[#161616] border-b border-[#1e1e1e]">
-                <span className="flex-1 text-xs font-medium text-[#444] uppercase tracking-wider">Name</span>
-                <span className="w-36 text-xs font-medium text-[#444] uppercase tracking-wider text-right hidden sm:block">Added by</span>
-                <span className="w-36 text-xs font-medium text-[#444] uppercase tracking-wider text-right">Added</span>
-              </div>
-              {filteredFiles.map((file, i) => (
-                <div key={file.id} className={`flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-[#181818] transition-colors ${i < filteredFiles.length - 1 ? 'border-b border-[#1a1a1a]' : ''}`}>
-                  <FileTypeIcon type={file.type} />
-                  <span className="flex-1 text-sm text-[#ccc] font-medium truncate hover:text-white transition-colors">{file.name}</span>
-                  <div className="w-36 hidden sm:flex items-center justify-end gap-2">
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0" style={{ background: file.avatarColor }}>{file.addedBy}</div>
-                  </div>
-                  <span className="w-36 text-xs text-[#444] text-right shrink-0">{file.added}</span>
-                </div>
+          {/* Documents Header */}
+          <div className="p-3 border-b border-[#222] flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#666] uppercase tracking-wider">
+              {selectedFolder ? `${selectedFolder.name} Files` : 'Documents'}
+            </span>
+            <button
+              onClick={() => setShowNewDocModal(true)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+            >
+              + New
+            </button>
+          </div>
+
+          {/* Documents List */}
+          <div className="flex-1 p-2 space-y-1 overflow-y-auto">
+            {documents
+              .filter(d => !selectedFolder || d.folderId === selectedFolder.id)
+              .map(docItem => (
+                <button
+                  key={docItem.id}
+                  onClick={() => selectDocument(docItem.id)}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors ${
+                    activeDoc?.id === docItem.id
+                      ? 'bg-[#252525] text-white font-medium border border-[#333]'
+                      : 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${docItem.fileType === 'PDF' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                  <span className="truncate flex-1">{docItem.title}</span>
+                </button>
               ))}
-              {filteredFiles.length === 0 && (
-                <div className="flex items-center justify-center py-12 text-[#333] text-sm">No files match your search</div>
+            {documents.length === 0 && (
+              <p className="text-[11px] text-[#555] px-2 py-3 text-center">No documents found</p>
+            )}
+          </div>
+        </aside>
+
+        {/* Right Editor / Workspace Area */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#111]">
+          {activeDoc ? (
+            <>
+              {activeTab === 'editor' && (
+                <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-8">
+                  <textarea
+                    value={content}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    placeholder="Start typing your collaborative document in markdown..."
+                    className="flex-1 w-full bg-transparent resize-none outline-none font-mono text-sm leading-relaxed text-[#ddd] placeholder:text-[#444]"
+                  />
+                </div>
+              )}
+
+              {activeTab === 'versions' && (
+                <div className="flex-1 max-w-3xl mx-auto w-full p-8 overflow-y-auto">
+                  <h2 className="text-lg font-bold mb-4">Version History Snapshots</h2>
+                  <div className="space-y-3">
+                    {versions.map((ver) => (
+                      <div
+                        key={ver.id}
+                        className="bg-[#1a1a1a] border border-[#262626] rounded-xl p-4 flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-blue-400">v{ver.versionNumber}</span>
+                          <p className="text-sm font-medium text-white mt-0.5">{ver.title}</p>
+                          <p className="text-[11px] text-[#666] mt-1">
+                            Saved {ver.savedAt ? new Date(ver.savedAt).toLocaleString() : 'recently'} by {ver.savedBy}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRestoreVersion(ver.versionNumber)}
+                          className="h-8 px-3 rounded-lg border border-[#333] hover:border-white text-xs text-[#ccc] hover:text-white transition-colors"
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                    {versions.length === 0 && (
+                      <p className="text-xs text-[#555]">No previous version snapshots found.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'comments' && (
+                <div className="flex-1 max-w-2xl mx-auto w-full p-8 flex flex-col">
+                  <h2 className="text-lg font-bold mb-4">Document Comments & Discussions</h2>
+                  <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                    {comments.map((com) => (
+                      <div key={com.id} className={`border rounded-xl p-4 transition-colors ${com.resolved ? 'bg-[#151515] border-[#222] opacity-60' : 'bg-[#1a1a1a] border-[#2a2a2a]'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-white">{com.authorName || 'User'}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-[#555]">
+                              {com.createdAt ? new Date(com.createdAt).toLocaleString() : 'recently'}
+                            </span>
+                            <button
+                              onClick={() => handleResolveComment(com.id)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${com.resolved ? 'border-green-600/30 text-green-400' : 'border-[#333] text-[#888] hover:text-white'}`}
+                            >
+                              {com.resolved ? '✓ Resolved' : 'Resolve'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteComment(com.id)}
+                              className="text-[10px] text-red-400 hover:text-red-300"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-[#ccc] leading-relaxed">{com.text}</p>
+                      </div>
+                    ))}
+                    {comments.length === 0 && (
+                      <p className="text-xs text-[#555]">No comments yet.</p>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleAddComment} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                      placeholder="Write a comment..."
+                      className="flex-1 h-10 px-3.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-white text-xs placeholder:text-[#555] outline-none focus:border-[#444]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newCommentText.trim()}
+                      className="h-10 px-4 bg-white text-[#111] font-semibold text-xs rounded-lg hover:bg-[#eee] disabled:opacity-40 transition-colors"
+                    >
+                      Post
+                    </button>
+                  </form>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <p className="text-[#666] text-sm mb-3">No document selected</p>
+              <button
+                onClick={() => setShowNewDocModal(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg transition-colors"
+              >
+                Create Document
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Modal: New Folder */}
+      {showNewFolderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowNewFolderModal(false)}>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4">Create Folder</h3>
+            <form onSubmit={handleCreateFolder} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Folder Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Specifications"
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  autoFocus
+                  className="w-full h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm placeholder:text-[#444] outline-none focus:border-[#444]"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewFolderModal(false)}
+                  className="flex-1 h-10 rounded-lg border border-[#2a2a2a] text-[#888] text-sm hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newFolderName.trim()}
+                  className="flex-1 h-10 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-40"
+                >
+                  Create Folder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: New Document */}
+      {showNewDocModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowNewDocModal(false)}>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4">Create Document</h3>
+            <form onSubmit={handleCreateDocument} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Document Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Architecture Overview"
+                  value={newDocTitle}
+                  onChange={e => setNewDocTitle(e.target.value)}
+                  autoFocus
+                  className="w-full h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm placeholder:text-[#444] outline-none focus:border-[#444]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewDocType('DOC')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium border ${newDocType === 'DOC' ? 'bg-[#252525] border-white text-white' : 'border-[#2a2a2a] text-[#777]'}`}
+                  >
+                    Markdown / Doc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewDocType('PDF')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium border ${newDocType === 'PDF' ? 'bg-[#252525] border-white text-white' : 'border-[#2a2a2a] text-[#777]'}`}
+                  >
+                    PDF Document
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewDocModal(false)}
+                  className="flex-1 h-10 rounded-lg border border-[#2a2a2a] text-[#888] text-sm hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newDocTitle.trim()}
+                  className="flex-1 h-10 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-40"
+                >
+                  Create Document
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Share Document */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4">Share Document</h3>
+            
+            <form onSubmit={handleShare} className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Collaborator Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="collaborator@example.com"
+                  value={shareEmail}
+                  onChange={e => setShareEmail(e.target.value)}
+                  className="w-full h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm placeholder:text-[#444] outline-none focus:border-[#444]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Permission Role</label>
+                <select
+                  value={shareRole}
+                  onChange={e => setShareRole(e.target.value as Role)}
+                  className="w-full h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm outline-none focus:border-[#444]"
+                >
+                  <option value="EDITOR">Editor (Can edit)</option>
+                  <option value="VIEWER">Viewer (Read-only)</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="w-full h-10 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition-colors"
+              >
+                Share
+              </button>
+            </form>
+
+            <div className="border-t border-[#222] pt-4">
+              <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-2">Public Share Link</label>
+              {shareLinkUrl ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareLinkUrl}
+                    className="flex-1 h-9 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-xs text-white"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareLinkUrl)
+                      alert('Copied link!')
+                    }}
+                    className="h-9 px-3 bg-white text-[#111] text-xs font-semibold rounded-lg hover:bg-[#eee]"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGenerateShareLink}
+                  className="w-full h-9 rounded-lg border border-[#333] hover:border-[#444] text-xs text-[#ccc] hover:text-white"
+                >
+                  Generate Shareable Link
+                </button>
               )}
             </div>
-          </section>
+
+            <button
+              onClick={() => setShowShareModal(false)}
+              className="w-full mt-4 h-9 rounded-lg border border-[#2a2a2a] text-[#888] text-xs hover:text-white"
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </main>
+      )}
+
+      {/* Modal: Workspace Members & Invites */}
+      {showMembersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowMembersModal(false)}>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl w-full max-w-lg mx-4 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4">{currentWorkspace?.name} — Members</h3>
+
+            <form onSubmit={handleInviteMember} className="flex gap-2 mb-6">
+              <input
+                type="email"
+                required
+                placeholder="colleague@company.com"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                className="flex-1 h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-xs placeholder:text-[#555] outline-none focus:border-[#444]"
+              />
+              <select
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value as Role)}
+                className="h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-xs"
+              >
+                <option value="EDITOR">Editor</option>
+                <option value="ADMIN">Admin</option>
+                <option value="VIEWER">Viewer</option>
+              </select>
+              <button
+                type="submit"
+                className="h-10 px-4 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-500"
+              >
+                Invite
+              </button>
+            </form>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+              {members.map(m => (
+                <div key={m.id} className="flex items-center justify-between p-3 bg-[#111] rounded-lg border border-[#222]">
+                  <div>
+                    <p className="text-xs font-semibold text-white">{m.user?.name || 'Member'}</p>
+                    <p className="text-[11px] text-[#666]">{m.user?.email}</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#252525] text-blue-400">
+                    {m.role}
+                  </span>
+                </div>
+              ))}
+              {members.length === 0 && (
+                <p className="text-xs text-[#555]">No other members yet.</p>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowMembersModal(false)}
+              className="w-full h-9 rounded-lg border border-[#2a2a2a] text-[#888] text-xs hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

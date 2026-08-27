@@ -1,23 +1,29 @@
 import { useState } from 'react'
 import HomeScreen from './HomeScreen'
 import WorkspaceScreen from './WorkspaceScreen'
+import { AuthProvider } from './context/AuthContext'
 
-type Screen = { name: 'home' } | { name: 'workspace'; id: string }
+type Screen = 
+  | { name: 'home' } 
+  | { name: 'workspace'; workspaceId?: string | number; documentId?: string | number }
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
 
-  if (screen.name === 'workspace') {
-    return (
-      <WorkspaceScreen
-        onHome={() => setScreen({ name: 'home' })}
-      />
-    )
-  }
-
   return (
-    <HomeScreen
-      onOpenWorkspace={(id) => setScreen({ name: 'workspace', id })}
-    />
+    <AuthProvider>
+      {screen.name === 'workspace' ? (
+        <WorkspaceScreen
+          workspaceId={screen.workspaceId}
+          documentId={screen.documentId}
+          onHome={() => setScreen({ name: 'home' })}
+        />
+      ) : (
+        <HomeScreen
+          onOpenWorkspace={(wsId) => setScreen({ name: 'workspace', workspaceId: wsId })}
+          onOpenDocument={(docId, wsId) => setScreen({ name: 'workspace', documentId: docId, workspaceId: wsId })}
+        />
+      )}
+    </AuthProvider>
   )
 }
