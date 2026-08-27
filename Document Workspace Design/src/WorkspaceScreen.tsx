@@ -4,6 +4,7 @@ import { documentService } from './services/documentService'
 import { folderService } from './services/folderService'
 import { workspaceService } from './services/workspaceService'
 import { wsService } from './services/websocketService'
+import { VersionDiffViewer } from './components/VersionDiffViewer'
 import type { Document, Folder, Workspace, DocumentVersion, DocumentComment, DocumentEditMessage, FileType, Role } from './types/api'
 
 interface WorkspaceScreenProps {
@@ -25,6 +26,7 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [versions, setVersions] = useState<DocumentVersion[]>([])
+  const [selectedDiffVersion, setSelectedDiffVersion] = useState<DocumentVersion | null>(null)
   const [comments, setComments] = useState<DocumentComment[]>([])
   const [newCommentText, setNewCommentText] = useState('')
   const [replyParentId, setReplyParentId] = useState<number | null>(null)
@@ -577,33 +579,70 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
               )}
 
               {activeTab === 'versions' && (
-                <div className="flex-1 max-w-3xl mx-auto w-full p-8 overflow-y-auto">
-                  <h2 className="text-lg font-bold mb-4">Version History Snapshots</h2>
-                  <div className="space-y-3">
-                    {versions.map((ver) => (
-                      <div
-                        key={ver.id}
-                        className="bg-[#1a1a1a] border border-[#262626] rounded-xl p-4 flex items-center justify-between"
-                      >
+                <div className="flex-1 max-w-4xl mx-auto w-full p-8 overflow-y-auto">
+                  {selectedDiffVersion ? (
+                    <VersionDiffViewer
+                      oldTitle={selectedDiffVersion.title}
+                      oldContent={selectedDiffVersion.content || ''}
+                      newTitle={title}
+                      newContent={content}
+                      oldLabel={`v${selectedDiffVersion.versionNumber} (${selectedDiffVersion.savedBy || 'Snapshot'})`}
+                      newLabel="Current Editor Version"
+                      onRestore={() => {
+                        handleRestoreVersion(selectedDiffVersion.versionNumber)
+                        setSelectedDiffVersion(null)
+                      }}
+                      onClose={() => setSelectedDiffVersion(null)}
+                    />
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
                         <div>
-                          <span className="text-xs font-bold text-blue-400">v{ver.versionNumber}</span>
-                          <p className="text-sm font-medium text-white mt-0.5">{ver.title}</p>
-                          <p className="text-[11px] text-[#666] mt-1">
-                            Saved {ver.savedAt ? new Date(ver.savedAt).toLocaleString() : 'recently'} by {ver.savedBy}
+                          <h2 className="text-lg font-bold">Version History Snapshots</h2>
+                          <p className="text-xs text-[#777] mt-0.5">
+                            Select "Compare Diff" to preview line additions and deletions before restoring.
                           </p>
                         </div>
-                        <button
-                          onClick={() => handleRestoreVersion(ver.versionNumber)}
-                          className="h-8 px-3 rounded-lg border border-[#333] hover:border-white text-xs text-[#ccc] hover:text-white transition-colors"
-                        >
-                          Restore
-                        </button>
                       </div>
-                    ))}
-                    {versions.length === 0 && (
-                      <p className="text-xs text-[#555]">No previous version snapshots found.</p>
-                    )}
-                  </div>
+                      <div className="space-y-3">
+                        {versions.map((ver) => (
+                          <div
+                            key={ver.id}
+                            className="bg-[#1a1a1a] hover:bg-[#1e1e1e] border border-[#262626] rounded-xl p-4 flex items-center justify-between transition-colors"
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-blue-400">v{ver.versionNumber}</span>
+                                <span className="text-xs text-[#555]">•</span>
+                                <span className="text-xs text-[#777]">
+                                  {ver.savedAt ? new Date(ver.savedAt).toLocaleString() : 'recently'}
+                                </span>
+                              </div>
+                              <p className="text-sm font-medium text-white mt-1">{ver.title}</p>
+                              <p className="text-[11px] text-[#666] mt-0.5">Saved by {ver.savedBy || 'Collaborator'}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setSelectedDiffVersion(ver)}
+                                className="h-8 px-3 rounded-lg bg-[#252525] hover:bg-[#303030] text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <span>⇄</span> Compare Diff
+                              </button>
+                              <button
+                                onClick={() => handleRestoreVersion(ver.versionNumber)}
+                                className="h-8 px-3 rounded-lg border border-[#333] hover:border-white text-xs text-[#ccc] hover:text-white transition-colors cursor-pointer"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {versions.length === 0 && (
+                          <p className="text-xs text-[#555]">No previous version snapshots found.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
