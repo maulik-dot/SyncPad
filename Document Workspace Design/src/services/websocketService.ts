@@ -1,23 +1,35 @@
-import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs'
+import { Client, IMessage, StompSubscription } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { getAuthToken } from './api'
 import type { DocumentEditMessage } from '../types/api'
 
-export class DocumentWebSocketService {
+export interface PresenceMessage {
+  type: 'CURSOR' | 'JOIN' | 'LEAVE'
+  userEmail: string
+  userName: string
+  color: string
+  cursor?: { line: number; ch: number }
+  timestamp: number
+}
+
+class DocumentWebSocketService {
   private client: Client | null = null
   private subscription: StompSubscription | null = null
   private annotationSubscription: StompSubscription | null = null
-  private documentId: number | null = null
+  private presenceSubscription: StompSubscription | null = null
   private isConnected = false
+  private documentId: number | string | null = null
 
   connect(
-    documentId: number,
+    documentId: number | string,
     onMessageReceived: (message: DocumentEditMessage) => void,
-    onAnnotationReceived?: (annotation: any) => void
+    onAnnotationReceived?: (annotation: any) => void,
+    onPresenceReceived?: (presence: PresenceMessage) => void
   ) {
+    this.disconnect()
     this.documentId = documentId
     const token = getAuthToken()
-    const wsUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8082') + '/ws'
+    const wsUrl = (import.meta.env.VITE_API_URL ?? '') + '/ws'
 
     this.client = new Client({
       webSocketFactory: () => new SockJS(wsUrl) as WebSocket,
@@ -26,16 +38,17 @@ export class DocumentWebSocketService {
             Authorization: `Bearer ${token}`,
           }
         : {},
-      debug: () => {},
-      reconnectDelay: 4000,
+      reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
+      debug: () => {},
     })
 
     this.client.onConnect = () => {
       this.isConnected = true
 
-      this.subscription = this.client!.subscribe(`/topic/documents/${documentId}`, (message: IMessage) => {
+      // 1. Subscribe to document delta edits
+      this.subscription = this.client!.subscribe(`/topic/documents.${documentId}`, (message: IMessage) => {
         try {
           const payload: DocumentEditMessage = JSON.parse(message.body)
           onMessageReceived(payload)
@@ -44,9 +57,10 @@ export class DocumentWebSocketService {
         }
       })
 
+      // 2. Subscribe to PDF annotations
       if (onAnnotationReceived) {
         this.annotationSubscription = this.client!.subscribe(
-          `/topic/documents/${documentId}/pdf-annotations`,
+          `/topic/documents.${documentId}.pdf-annotations`,
           (message: IMessage) => {
             try {
               const payload = JSON.parse(message.body)
@@ -58,7 +72,20 @@ export class DocumentWebSocketService {
         )
       }
 
-      this.sendPresence()
+      // 3. Subscribe to real-time collaborator presence & cursors
+      if (onPresenceReceived) {
+        this.presenceSubscription = this.client!.subscribe(
+          `/topic/documents.${documentId}.presence`,
+          (message: IMessage) => {
+            try {
+              const payload: PresenceMessage = JSON.parse(message.body)
+              onPresenceReceived(payload)
+            } catch (e) {
+              console.error('Failed to parse Presence message', e)
+            }
+          }
+        )
+      }
     }
 
     this.client.onStompError = (frame) => {
@@ -104,18 +131,33 @@ export class DocumentWebSocketService {
     })
   }
 
-  sendPresence(senderName?: string) {
+  sendCursor(cursor: { line: number; ch: number }, userName?: string, color?: string) {
     if (!this.client || !this.isConnected || !this.documentId) return
 
-    const payload: Partial<DocumentEditMessage> = {
-      documentId: this.documentId,
-      senderName,
-      type: 'PRESENCE',
-      timestamp: Date.now(),
+    const payload = {
+      type: 'CURSOR',
+      userName: userName || 'Collaborator',
+      color: color || '#3B82F6',
+      cursor,
     }
 
     this.client.publish({
-      destination: `/app/documents/${this.documentId}/edit`,
+      destination: `/app/documents/${this.documentId}/presence`,
+      body: JSON.stringify(payload),
+    })
+  }
+
+  sendJoin(userName?: string, color?: string) {
+    if (!this.client || !this.isConnected || !this.documentId) return
+
+    const payload = {
+      type: 'JOIN',
+      userName: userName || 'Collaborator',
+      color: color || '#3B82F6',
+    }
+
+    this.client.publish({
+      destination: `/app/documents/${this.documentId}/presence`,
       body: JSON.stringify(payload),
     })
   }
@@ -137,6 +179,10 @@ export class DocumentWebSocketService {
     if (this.annotationSubscription) {
       this.annotationSubscription.unsubscribe()
       this.annotationSubscription = null
+    }
+    if (this.presenceSubscription) {
+      this.presenceSubscription.unsubscribe()
+      this.presenceSubscription = null
     }
     if (this.client) {
       this.client.deactivate()

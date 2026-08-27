@@ -1,12 +1,14 @@
 package com.example.syncpad.controller;
 
 import java.security.Principal;
+import java.util.Map;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 
 import com.example.syncpad.dto.message.DocumentEditMessage;
@@ -16,9 +18,9 @@ import com.example.syncpad.service.DocumentService;
 public class DocumentWebSocketController {
 
     private final DocumentService documentService;
-    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public DocumentWebSocketController(DocumentService documentService, org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
+    public DocumentWebSocketController(DocumentService documentService, SimpMessagingTemplate messagingTemplate) {
         this.documentService = documentService;
         this.messagingTemplate = messagingTemplate;
     }
@@ -31,7 +33,7 @@ public class DocumentWebSocketController {
             SimpMessageHeaderAccessor headerAccessor
     ) {
         if (principal == null || principal.getName() == null) {
-            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket edit operation");
+            throw new AccessDeniedException("Unauthorized WebSocket edit operation");
         }
         String senderEmail = principal.getName();
         documentService.assertCanEditDocument(documentId, senderEmail);
@@ -40,7 +42,6 @@ public class DocumentWebSocketController {
         message.setDocumentId(documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/save")
@@ -50,7 +51,7 @@ public class DocumentWebSocketController {
             Principal principal
     ) {
         if (principal == null || principal.getName() == null) {
-            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket save operation");
+            throw new AccessDeniedException("Unauthorized WebSocket save operation");
         }
         String senderEmail = principal.getName();
         documentService.assertCanEditDocument(documentId, senderEmail);
@@ -61,17 +62,35 @@ public class DocumentWebSocketController {
         message.setType("SAVED");
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
+    }
+
+    @MessageMapping("/documents/{documentId}/presence")
+    public void handlePresence(
+            @DestinationVariable Long documentId,
+            @Payload Map<String, Object> message,
+            Principal principal
+    ) {
+        if (principal == null || principal.getName() == null) {
+            throw new AccessDeniedException("Unauthorized WebSocket presence operation");
+        }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+
+        message.put("userEmail", senderEmail);
+        message.put("documentId", documentId);
+        message.put("timestamp", System.currentTimeMillis());
+
+        messagingTemplate.convertAndSend("/topic/documents." + documentId + ".presence", (Object) message);
     }
 
     @MessageMapping("/documents/{documentId}/pdf-annotation")
     public void handlePdfAnnotation(
             @DestinationVariable Long documentId,
-            @Payload java.util.Map<String, Object> message,
+            @Payload Map<String, Object> message,
             Principal principal
     ) {
         if (principal == null || principal.getName() == null) {
-            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket annotation operation");
+            throw new AccessDeniedException("Unauthorized WebSocket annotation operation");
         }
         String senderEmail = principal.getName();
         documentService.assertCanEditDocument(documentId, senderEmail);
@@ -80,6 +99,5 @@ public class DocumentWebSocketController {
         message.put("documentId", documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".pdf-annotations", (Object) message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/pdf-annotations", (Object) message);
     }
 }

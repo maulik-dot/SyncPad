@@ -272,17 +272,6 @@ export default function HomeScreen({
           <span className="text-white font-semibold text-sm">SyncPad</span>
         </div>
 
-        <button
-          onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-xs text-[#888] hover:text-white transition-colors cursor-pointer"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span>Search documents...</span>
-          <kbd className="font-mono text-[10px] px-1 py-0.5 rounded bg-[#2a2a2a] text-[#aaa]">⌘K</kbd>
-        </button>
-
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <>

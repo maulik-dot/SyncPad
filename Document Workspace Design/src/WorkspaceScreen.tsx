@@ -34,6 +34,12 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
   const [activeTab, setActiveTab] = useState<'editor' | 'versions' | 'comments'>('editor')
   const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Unsaved changes'>('Saved')
   const [activeCollaborators, setActiveCollaborators] = useState<string[]>([])
+  const [collaborators, setCollaborators] = useState<
+    Map<string, { userName: string; color: string; cursor?: { line: number; ch: number }; lastSeen: number }>
+  >(new Map())
+  const userColor = useRef<string>(
+    ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4'][Math.floor(Math.random() * 6)]
+  ).current
   
   // Modals
   const [shareEmail, setShareEmail] = useState('')
@@ -156,18 +162,41 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
         } else if (msg.type === 'SAVED') {
           setSaveStatus('Saved')
           documentService.getVersions(numId).then(setVersions).catch(() => {})
-        } else if (msg.type === 'PRESENCE') {
-          if (msg.senderName && !activeCollaborators.includes(msg.senderName)) {
-            setActiveCollaborators(prev => [...new Set([...prev, msg.senderName!])])
-          }
         }
+      },
+      undefined,
+      (pres: any) => {
+        if (pres.userEmail && pres.userEmail === user?.email) return
+        setCollaborators(prev => {
+          const next = new Map(prev)
+          next.set(pres.userEmail || pres.userName, {
+            userName: pres.userName || 'Collaborator',
+            color: pres.color || '#3B82F6',
+            cursor: pres.cursor,
+            lastSeen: Date.now(),
+          })
+          return next
+        })
       }
     )
+
+    setTimeout(() => {
+      wsService.sendJoin(user?.name || user?.email || 'Collaborator', userColor)
+    }, 500)
 
     return () => {
       wsService.disconnect()
     }
   }, [activeDoc?.id, user?.email])
+
+  const handleCursorMove = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const target = e.currentTarget
+    const textBefore = target.value.substring(0, target.selectionStart)
+    const line = textBefore.split('\n').length
+    const lastNewline = textBefore.lastIndexOf('\n')
+    const ch = target.selectionStart - (lastNewline === -1 ? 0 : lastNewline + 1)
+    wsService.sendCursor({ line, ch }, user?.name || user?.email || 'Collaborator', userColor)
+  }
 
   // 4. Handle Content Changes (Debounced Autosave + WebSocket Broadcast)
   const handleContentChange = (newText: string) => {
@@ -421,15 +450,16 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
 
           {activeDoc && <span className="text-[11px] text-[#666]">{saveStatus}</span>}
 
-          {activeCollaborators.length > 0 && (
-            <div className="flex items-center gap-1">
-              {activeCollaborators.map((c, i) => (
+          {collaborators.size > 0 && (
+            <div className="flex items-center -space-x-1.5 pl-1">
+              {Array.from(collaborators.values()).map((c, i) => (
                 <div
                   key={i}
-                  title={`Collaborator: ${c}`}
-                  className="w-6 h-6 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#111]"
+                  title={`Live Collaborator: ${c.userName}${c.cursor ? ` (Editing line ${c.cursor.line})` : ''}`}
+                  className="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#161616] cursor-default shadow-sm uppercase transform hover:scale-110 transition-transform"
+                  style={{ backgroundColor: c.color }}
                 >
-                  {c[0].toUpperCase()}
+                  {c.userName.slice(0, 2)}
                 </div>
               ))}
             </div>
@@ -612,9 +642,35 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
             <>
               {activeTab === 'editor' && (
                 <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-8">
+                  {/* Live Collaborator Cursor & Presence Bar */}
+                  {Array.from(collaborators.values()).filter(c => c.cursor).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mb-3 px-3 py-1.5 rounded-lg bg-[#181818] border border-[#262626]">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#666]">Live Presence:</span>
+                      {Array.from(collaborators.values())
+                        .filter(c => c.cursor)
+                        .map((c, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all"
+                            style={{
+                              backgroundColor: `${c.color}15`,
+                              borderColor: `${c.color}40`,
+                              color: c.color
+                            }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: c.color }} />
+                            <span>{c.userName}</span>
+                            <span className="text-[10px] opacity-75 font-mono">Ln {c.cursor?.line}, Col {c.cursor?.ch}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
                   <textarea
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
+                    onKeyUp={handleCursorMove}
+                    onClick={handleCursorMove}
                     placeholder="Start typing your collaborative document in markdown..."
                     className="flex-1 w-full bg-transparent resize-none outline-none font-mono text-sm leading-relaxed text-[#ddd] placeholder:text-[#444]"
                   />

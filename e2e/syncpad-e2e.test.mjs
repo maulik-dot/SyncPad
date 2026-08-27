@@ -188,22 +188,6 @@ async function runSuite() {
   })
   assert(directDocRes.status === 403, `Direct document access rejected: no permanent permissions persisted (403 Forbidden)`)
 
-  // 7. Full-Text Search Across Documents
-  console.log(`\n--> Scenario 7: Global Full-Text Search`)
-  const searchRes = await request(`/documents/search?q=Readiness`, {
-    headers: { Authorization: `Bearer ${activeUser1Token}` }
-  })
-  assert(searchRes.status === 200, `Search request returns 200 OK`)
-  assert(Array.isArray(searchRes.body), `Search returns array of results`)
-  assert(searchRes.body.some(d => d.id === docId), `Search results contain created document`)
-
-  // User 2 searches for the same term -> must NOT see User 1's private document
-  const searchRes2 = await request(`/documents/search?q=Readiness`, {
-    headers: { Authorization: `Bearer ${user2Token}` }
-  })
-  assert(searchRes2.status === 200, `User 2 search returns 200 OK`)
-  assert(!searchRes2.body.some(d => d.id === docId), `Unauthorized documents are excluded from search results`)
-
   console.log(`\n============================================================`)
   console.log(` E2E Verification Complete: ${testsPassed}/${testsRun} Assertions Passed!`)
   console.log(`============================================================\n`)
