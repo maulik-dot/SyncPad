@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.syncpad.dto.response.DocumentDetailResponse;
+import com.example.syncpad.dto.response.DocumentResponse;
 import com.example.syncpad.dto.response.DocumentStatsResponse;
 import com.example.syncpad.dto.response.DocumentVersionResponse;
 import com.example.syncpad.dto.response.PermissionResponse;
@@ -854,5 +855,17 @@ public class DocumentService {
         document.setPdfUrl(null);
         document.setUpdatedAt(java.time.LocalDateTime.now());
         return documentRepository.save(document);
+    }
+
+    public List<DocumentResponse> searchDocuments(String query, String userEmail) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+        User user = getUserByEmail(userEmail);
+        List<Document> matched = documentRepository.searchByTitleOrContent(query.trim());
+        return matched.stream()
+                .filter(doc -> getEffectiveRole(doc, user) != null)
+                .map(DocumentResponse::from)
+                .toList();
     }
 }

@@ -97,6 +97,14 @@ public class DocumentController {
         return docs.stream().map(DocumentResponse::from).collect(Collectors.toList());
     }
 
+    @GetMapping("/search")
+    public List<DocumentResponse> searchDocuments(
+            @RequestParam("q") String query,
+            Authentication authentication
+    ) {
+        return documentService.searchDocuments(query, authentication.getName());
+    }
+
     @GetMapping("/{id}")
     public DocumentResponse getDocument(@PathVariable Long id, Authentication authentication) {
         return DocumentResponse.from(documentService.getDocument(id, authentication.getName()));

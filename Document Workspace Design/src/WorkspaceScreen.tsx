@@ -403,6 +403,18 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#202020] hover:bg-[#282828] border border-[#2e2e2e] text-[11px] text-[#888] hover:text-white transition-colors cursor-pointer"
+            title="Search documents (Cmd+K)"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>Search</span>
+            <kbd className="font-mono text-[9px] px-1 py-0.2 rounded bg-[#333] text-[#aaa]">⌘K</kbd>
+          </button>
+
           {activeDoc && <span className="text-[11px] text-[#666]">{saveStatus}</span>}
 
           {activeCollaborators.length > 0 && (
