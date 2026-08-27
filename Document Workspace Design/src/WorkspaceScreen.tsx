@@ -5,6 +5,7 @@ import { folderService } from './services/folderService'
 import { workspaceService } from './services/workspaceService'
 import { wsService } from './services/websocketService'
 import { VersionDiffViewer } from './components/VersionDiffViewer'
+import { exportToMarkdown, exportToHtml, exportToPrintPdf } from './utils/exportUtils'
 import type { Document, Folder, Workspace, DocumentVersion, DocumentComment, DocumentEditMessage, FileType, Role } from './types/api'
 
 interface WorkspaceScreenProps {
@@ -38,6 +39,7 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
   const [shareEmail, setShareEmail] = useState('')
   const [shareRole, setShareRole] = useState<Role>('EDITOR')
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const [shareLinkUrl, setShareLinkUrl] = useState<string | null>(null)
   const [showNewFolderModal, setShowNewFolderModal] = useState(false)
   const [showNewDocModal, setShowNewDocModal] = useState(false)
@@ -466,10 +468,51 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
             <>
               <button
                 onClick={() => setShowShareModal(true)}
-                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors cursor-pointer"
               >
                 Share
               </button>
+
+              {/* Export Suite Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(prev => !prev)}
+                  className="h-8 px-2.5 rounded-lg border border-[#333] hover:border-[#555] text-[#ccc] hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer bg-[#1c1c1c]"
+                  title="Export Document (Markdown, HTML, PDF)"
+                >
+                  <span>⤓</span>
+                  <span>Export</span>
+                </button>
+
+                {showExportMenu && (
+                  <div 
+                    className="absolute right-0 mt-1.5 w-48 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
+                    onClick={() => setShowExportMenu(false)}
+                  >
+                    <button
+                      onClick={() => exportToMarkdown(title, content, currentWorkspace?.name, activeDoc?.version)}
+                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
+                    >
+                      <span className="text-blue-400 font-mono font-bold text-[10px] bg-blue-950/40 px-1.5 py-0.5 rounded">.MD</span>
+                      <span>Markdown (.md)</span>
+                    </button>
+                    <button
+                      onClick={() => exportToHtml(title, content, currentWorkspace?.name)}
+                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
+                    >
+                      <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-950/40 px-1.5 py-0.5 rounded">.HTML</span>
+                      <span>HTML Document (.html)</span>
+                    </button>
+                    <button
+                      onClick={() => exportToPrintPdf(title, content, currentWorkspace?.name)}
+                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
+                    >
+                      <span className="text-red-400 font-mono font-bold text-[10px] bg-red-950/40 px-1.5 py-0.5 rounded">.PDF</span>
+                      <span>Print to PDF (.pdf)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleDeleteDocument}
                 className="h-8 px-2.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"
