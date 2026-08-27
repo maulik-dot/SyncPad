@@ -54,7 +54,6 @@ public class AuthService {
 
     private void ensureDefaultWorkspace(User user) {
         if (workspaceRepository.findByOwnerId(user.getId()).isEmpty()) {
-            String defaultWsName = (user.getName() != null && !user.getName().isBlank() ? user.getName() : "Personal") + "'s Workspace";
             String baseName = (user.getName() != null && !user.getName().isBlank() ? user.getName() : "Personal") + "'s Workspace";
             String defaultWsName = baseName;
             if (workspaceRepository.findByName(defaultWsName).isPresent()) {

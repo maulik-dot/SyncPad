@@ -31,7 +31,6 @@ export function setup() {
     const payload = JSON.stringify({
       email: `k6_seed_${i}_${Date.now()}@syncpad.bench`,
       password: 'Password123!',
-      name: `K6 User ${i}`,
       name: `K6 User ${i} ${Date.now()}`,
     });
 
@@ -41,7 +40,6 @@ export function setup() {
 
     try {
       const data = JSON.parse(res.body);
-      if (data.accessToken) tokens.push(data.accessToken);
       const token = data.token || data.accessToken;
       if (token) tokens.push(token);
     } catch {}

@@ -47,12 +47,8 @@ async function setupUsers(count) {
     const res = await fetch(`${BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'Password123!', name: `Seed User ${i}` })
       body: JSON.stringify({ email, password: 'Password123!', name: `Seed User ${i} ${Date.now()}` })
     });
-    const data = await res.json();
-    if (data.accessToken) {
-      tokens.push(data.accessToken);
     const data = await res.json().catch(() => ({}));
     const token = data.token || data.accessToken;
     if (token) {
