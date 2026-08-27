@@ -34,6 +34,7 @@ public class DatabaseMigrationConfig {
                 .locations("classpath:db/migration")
                 .load();
 
+        flyway.repair();
         int migrationsApplied = flyway.migrate().migrationsExecuted;
         logger.info("Flyway successfully applied {} database migration(s).", migrationsApplied);
         return flyway;

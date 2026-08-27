@@ -19,6 +19,11 @@ export const documentService = {
     return apiFetch<Document[]>(`/documents${queryString}`)
   },
 
+  async searchDocuments(query: string): Promise<Document[]> {
+    if (!query || !query.trim()) return []
+    return apiFetch<Document[]>(`/documents/search?q=${encodeURIComponent(query.trim())}`)
+  },
+
   async getDocument(id: number | string): Promise<Document> {
     return apiFetch<Document>(`/documents/${id}`)
   },

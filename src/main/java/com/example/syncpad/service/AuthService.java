@@ -55,6 +55,11 @@ public class AuthService {
     private void ensureDefaultWorkspace(User user) {
         if (workspaceRepository.findByOwnerId(user.getId()).isEmpty()) {
             String defaultWsName = (user.getName() != null && !user.getName().isBlank() ? user.getName() : "Personal") + "'s Workspace";
+            String baseName = (user.getName() != null && !user.getName().isBlank() ? user.getName() : "Personal") + "'s Workspace";
+            String defaultWsName = baseName;
+            if (workspaceRepository.findByName(defaultWsName).isPresent()) {
+                defaultWsName = baseName + " (" + user.getId() + ")";
+            }
             String initial = (user.getName() != null && !user.getName().isBlank()) ? user.getName().substring(0, 1).toUpperCase() : "P";
             Workspace ws = new Workspace(defaultWsName, "Personal workspace for documents, whiteboards and notes", "#2563eb", initial, user);
             Workspace savedWs = workspaceRepository.save(ws);

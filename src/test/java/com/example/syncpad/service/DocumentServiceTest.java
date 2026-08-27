@@ -90,4 +90,25 @@ public class DocumentServiceTest {
                 documentService.updateDocument(30L, "New Title", "New Content", "charlie@example.com")
         );
     }
+
+    @Test
+    public void testSearchDocuments_SuccessAndFiltering() {
+        User alice = new User("Alice", "alice@example.com", "pass");
+        alice.setId(1L);
+
+        Document doc1 = new Document("Architecture Blueprint", "Contains microservice details", alice);
+        doc1.setId(101L);
+        Document doc2 = new Document("Secret Memo", "Unauthorized notes", null);
+        doc2.setId(102L);
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(alice));
+        when(documentRepository.searchByTitleOrContent("microservice")).thenReturn(java.util.List.of(doc1, doc2));
+        when(permissionRepository.findByUserAndDocument(alice, doc2)).thenReturn(Optional.empty());
+
+        java.util.List<com.example.syncpad.dto.response.DocumentResponse> results =
+                documentService.searchDocuments("microservice", "alice@example.com");
+
+        assertEquals(1, results.size());
+        assertEquals("Architecture Blueprint", results.get(0).getTitle());
+    }
 }

@@ -2,6 +2,7 @@ package com.example.syncpad.security;
 
 import java.io.IOException;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -17,15 +18,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private final RateLimiterStore rateLimiterStore;
 
+    @Value("${syncpad.ratelimit.login-limit:30}")
+    private int loginLimit = 30;
+
+    @Value("${syncpad.ratelimit.register-limit:25}")
+    private int registerLimit = 25;
+
+    @Value("${syncpad.ratelimit.share-limit:100}")
+    private int shareLimit = 100;
+
+    @Value("${syncpad.ratelimit.ws-limit:120}")
+    private int wsLimit = 120;
+
+    private static final long WINDOW_MS = 60_000L;
+
     public RateLimitingFilter(RateLimiterStore rateLimiterStore) {
         this.rateLimiterStore = rateLimiterStore;
     }
-
-    private static final int LOGIN_LIMIT = 5;
-    private static final int REGISTER_LIMIT = 3;
-    private static final int SHARE_LIMIT = 20;
-    private static final int WS_LIMIT = 30;
-    private static final long WINDOW_MS = 60_000L;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -56,10 +65,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private int getLimitForPath(String path) {
-        if (path.startsWith("/auth/login")) return LOGIN_LIMIT;
-        if (path.startsWith("/auth/register")) return REGISTER_LIMIT;
-        if (path.startsWith("/documents/share/")) return SHARE_LIMIT;
-        if (path.startsWith("/ws")) return WS_LIMIT;
+        if (path.startsWith("/auth/login")) return loginLimit;
+        if (path.startsWith("/auth/register")) return registerLimit;
+        if (path.startsWith("/documents/share/")) return shareLimit;
+        if (path.startsWith("/ws")) return wsLimit;
         return -1;
     }
 

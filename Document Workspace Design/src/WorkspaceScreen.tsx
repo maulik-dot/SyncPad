@@ -4,8 +4,6 @@ import { documentService } from './services/documentService'
 import { folderService } from './services/folderService'
 import { workspaceService } from './services/workspaceService'
 import { wsService } from './services/websocketService'
-import { VersionDiffViewer } from './components/VersionDiffViewer'
-import { exportToMarkdown, exportToHtml, exportToPrintPdf } from './utils/exportUtils'
 import type { Document, Folder, Workspace, DocumentVersion, DocumentComment, DocumentEditMessage, FileType, Role } from './types/api'
 
 interface WorkspaceScreenProps {
@@ -27,25 +25,17 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [versions, setVersions] = useState<DocumentVersion[]>([])
-  const [selectedDiffVersion, setSelectedDiffVersion] = useState<DocumentVersion | null>(null)
   const [comments, setComments] = useState<DocumentComment[]>([])
   const [newCommentText, setNewCommentText] = useState('')
   const [replyParentId, setReplyParentId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'editor' | 'versions' | 'comments'>('editor')
   const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Unsaved changes'>('Saved')
   const [activeCollaborators, setActiveCollaborators] = useState<string[]>([])
-  const [collaborators, setCollaborators] = useState<
-    Map<string, { userName: string; color: string; cursor?: { line: number; ch: number }; lastSeen: number }>
-  >(new Map())
-  const userColor = useRef<string>(
-    ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4'][Math.floor(Math.random() * 6)]
-  ).current
   
   // Modals
   const [shareEmail, setShareEmail] = useState('')
   const [shareRole, setShareRole] = useState<Role>('EDITOR')
   const [showShareModal, setShowShareModal] = useState(false)
-  const [showExportMenu, setShowExportMenu] = useState(false)
   const [shareLinkUrl, setShareLinkUrl] = useState<string | null>(null)
   const [showNewFolderModal, setShowNewFolderModal] = useState(false)
   const [showNewDocModal, setShowNewDocModal] = useState(false)
@@ -162,41 +152,18 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
         } else if (msg.type === 'SAVED') {
           setSaveStatus('Saved')
           documentService.getVersions(numId).then(setVersions).catch(() => {})
+        } else if (msg.type === 'PRESENCE') {
+          if (msg.senderName && !activeCollaborators.includes(msg.senderName)) {
+            setActiveCollaborators(prev => [...new Set([...prev, msg.senderName!])])
+          }
         }
-      },
-      undefined,
-      (pres: any) => {
-        if (pres.userEmail && pres.userEmail === user?.email) return
-        setCollaborators(prev => {
-          const next = new Map(prev)
-          next.set(pres.userEmail || pres.userName, {
-            userName: pres.userName || 'Collaborator',
-            color: pres.color || '#3B82F6',
-            cursor: pres.cursor,
-            lastSeen: Date.now(),
-          })
-          return next
-        })
       }
     )
-
-    setTimeout(() => {
-      wsService.sendJoin(user?.name || user?.email || 'Collaborator', userColor)
-    }, 500)
 
     return () => {
       wsService.disconnect()
     }
   }, [activeDoc?.id, user?.email])
-
-  const handleCursorMove = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-    const target = e.currentTarget
-    const textBefore = target.value.substring(0, target.selectionStart)
-    const line = textBefore.split('\n').length
-    const lastNewline = textBefore.lastIndexOf('\n')
-    const ch = target.selectionStart - (lastNewline === -1 ? 0 : lastNewline + 1)
-    wsService.sendCursor({ line, ch }, user?.name || user?.email || 'Collaborator', userColor)
-  }
 
   // 4. Handle Content Changes (Debounced Autosave + WebSocket Broadcast)
   const handleContentChange = (newText: string) => {
@@ -450,16 +417,15 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
 
           {activeDoc && <span className="text-[11px] text-[#666]">{saveStatus}</span>}
 
-          {collaborators.size > 0 && (
-            <div className="flex items-center -space-x-1.5 pl-1">
-              {Array.from(collaborators.values()).map((c, i) => (
+          {activeCollaborators.length > 0 && (
+            <div className="flex items-center gap-1">
+              {activeCollaborators.map((c, i) => (
                 <div
                   key={i}
-                  title={`Live Collaborator: ${c.userName}${c.cursor ? ` (Editing line ${c.cursor.line})` : ''}`}
-                  className="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#161616] cursor-default shadow-sm uppercase transform hover:scale-110 transition-transform"
-                  style={{ backgroundColor: c.color }}
+                  title={`Collaborator: ${c}`}
+                  className="w-6 h-6 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#111]"
                 >
-                  {c.userName.slice(0, 2)}
+                  {c[0].toUpperCase()}
                 </div>
               ))}
             </div>
@@ -498,51 +464,10 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
             <>
               <button
                 onClick={() => setShowShareModal(true)}
-                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors cursor-pointer"
+                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
               >
                 Share
               </button>
-
-              {/* Export Suite Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportMenu(prev => !prev)}
-                  className="h-8 px-2.5 rounded-lg border border-[#333] hover:border-[#555] text-[#ccc] hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer bg-[#1c1c1c]"
-                  title="Export Document (Markdown, HTML, PDF)"
-                >
-                  <span>⤓</span>
-                  <span>Export</span>
-                </button>
-
-                {showExportMenu && (
-                  <div 
-                    className="absolute right-0 mt-1.5 w-48 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
-                    onClick={() => setShowExportMenu(false)}
-                  >
-                    <button
-                      onClick={() => exportToMarkdown(title, content, currentWorkspace?.name, activeDoc?.version)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
-                    >
-                      <span className="text-blue-400 font-mono font-bold text-[10px] bg-blue-950/40 px-1.5 py-0.5 rounded">.MD</span>
-                      <span>Markdown (.md)</span>
-                    </button>
-                    <button
-                      onClick={() => exportToHtml(title, content, currentWorkspace?.name)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
-                    >
-                      <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-950/40 px-1.5 py-0.5 rounded">.HTML</span>
-                      <span>HTML Document (.html)</span>
-                    </button>
-                    <button
-                      onClick={() => exportToPrintPdf(title, content, currentWorkspace?.name)}
-                      className="w-full text-left px-3.5 py-2 text-xs text-[#ddd] hover:bg-[#252525] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
-                    >
-                      <span className="text-red-400 font-mono font-bold text-[10px] bg-red-950/40 px-1.5 py-0.5 rounded">.PDF</span>
-                      <span>Print to PDF (.pdf)</span>
-                    </button>
-                  </div>
-                )}
-              </div>
               <button
                 onClick={handleDeleteDocument}
                 className="h-8 px-2.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"
@@ -642,35 +567,9 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
             <>
               {activeTab === 'editor' && (
                 <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-8">
-                  {/* Live Collaborator Cursor & Presence Bar */}
-                  {Array.from(collaborators.values()).filter(c => c.cursor).length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 mb-3 px-3 py-1.5 rounded-lg bg-[#181818] border border-[#262626]">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#666]">Live Presence:</span>
-                      {Array.from(collaborators.values())
-                        .filter(c => c.cursor)
-                        .map((c, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all"
-                            style={{
-                              backgroundColor: `${c.color}15`,
-                              borderColor: `${c.color}40`,
-                              color: c.color
-                            }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: c.color }} />
-                            <span>{c.userName}</span>
-                            <span className="text-[10px] opacity-75 font-mono">Ln {c.cursor?.line}, Col {c.cursor?.ch}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-
                   <textarea
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
-                    onKeyUp={handleCursorMove}
-                    onClick={handleCursorMove}
                     placeholder="Start typing your collaborative document in markdown..."
                     className="flex-1 w-full bg-transparent resize-none outline-none font-mono text-sm leading-relaxed text-[#ddd] placeholder:text-[#444]"
                   />
@@ -678,70 +577,33 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
               )}
 
               {activeTab === 'versions' && (
-                <div className="flex-1 max-w-4xl mx-auto w-full p-8 overflow-y-auto">
-                  {selectedDiffVersion ? (
-                    <VersionDiffViewer
-                      oldTitle={selectedDiffVersion.title}
-                      oldContent={selectedDiffVersion.content || ''}
-                      newTitle={title}
-                      newContent={content}
-                      oldLabel={`v${selectedDiffVersion.versionNumber} (${selectedDiffVersion.savedBy || 'Snapshot'})`}
-                      newLabel="Current Editor Version"
-                      onRestore={() => {
-                        handleRestoreVersion(selectedDiffVersion.versionNumber)
-                        setSelectedDiffVersion(null)
-                      }}
-                      onClose={() => setSelectedDiffVersion(null)}
-                    />
-                  ) : (
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
+                <div className="flex-1 max-w-3xl mx-auto w-full p-8 overflow-y-auto">
+                  <h2 className="text-lg font-bold mb-4">Version History Snapshots</h2>
+                  <div className="space-y-3">
+                    {versions.map((ver) => (
+                      <div
+                        key={ver.id}
+                        className="bg-[#1a1a1a] border border-[#262626] rounded-xl p-4 flex items-center justify-between"
+                      >
                         <div>
-                          <h2 className="text-lg font-bold">Version History Snapshots</h2>
-                          <p className="text-xs text-[#777] mt-0.5">
-                            Select "Compare Diff" to preview line additions and deletions before restoring.
+                          <span className="text-xs font-bold text-blue-400">v{ver.versionNumber}</span>
+                          <p className="text-sm font-medium text-white mt-0.5">{ver.title}</p>
+                          <p className="text-[11px] text-[#666] mt-1">
+                            Saved {ver.savedAt ? new Date(ver.savedAt).toLocaleString() : 'recently'} by {ver.savedBy}
                           </p>
                         </div>
+                        <button
+                          onClick={() => handleRestoreVersion(ver.versionNumber)}
+                          className="h-8 px-3 rounded-lg border border-[#333] hover:border-white text-xs text-[#ccc] hover:text-white transition-colors"
+                        >
+                          Restore
+                        </button>
                       </div>
-                      <div className="space-y-3">
-                        {versions.map((ver) => (
-                          <div
-                            key={ver.id}
-                            className="bg-[#1a1a1a] hover:bg-[#1e1e1e] border border-[#262626] rounded-xl p-4 flex items-center justify-between transition-colors"
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-blue-400">v{ver.versionNumber}</span>
-                                <span className="text-xs text-[#555]">•</span>
-                                <span className="text-xs text-[#777]">
-                                  {ver.savedAt ? new Date(ver.savedAt).toLocaleString() : 'recently'}
-                                </span>
-                              </div>
-                              <p className="text-sm font-medium text-white mt-1">{ver.title}</p>
-                              <p className="text-[11px] text-[#666] mt-0.5">Saved by {ver.savedBy || 'Collaborator'}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setSelectedDiffVersion(ver)}
-                                className="h-8 px-3 rounded-lg bg-[#252525] hover:bg-[#303030] text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors cursor-pointer flex items-center gap-1"
-                              >
-                                <span>⇄</span> Compare Diff
-                              </button>
-                              <button
-                                onClick={() => handleRestoreVersion(ver.versionNumber)}
-                                className="h-8 px-3 rounded-lg border border-[#333] hover:border-white text-xs text-[#ccc] hover:text-white transition-colors cursor-pointer"
-                              >
-                                Restore
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        {versions.length === 0 && (
-                          <p className="text-xs text-[#555]">No previous version snapshots found.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                    ))}
+                    {versions.length === 0 && (
+                      <p className="text-xs text-[#555]">No previous version snapshots found.</p>
+                    )}
+                  </div>
                 </div>
               )}
 
