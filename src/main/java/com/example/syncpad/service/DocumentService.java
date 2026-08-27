@@ -173,9 +173,28 @@ public class DocumentService {
 
         Folder folder = null;
         if (folderId != null) {
-            folder = folderRepository.findById(folderId).orElse(null);
-            if (folder != null && (workspaceName == null || workspaceName.isBlank())) {
+            folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new DocumentNotFoundException("Folder not found with ID: " + folderId));
+            if (workspaceName == null || workspaceName.isBlank()) {
                 workspaceName = folder.getWorkspaceName();
+            }
+            Role folderRole = folderService.getEffectiveRole(folder, owner);
+            if (folderRole == null || folderRole == Role.VIEWER || folderRole == Role.RESTRICTED) {
+                throw new PermissionDeniedException("Access restricted: You do not have permission to add documents to this folder");
+            }
+        }
+
+        if (workspaceName != null && !workspaceName.isBlank()) {
+            java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(workspaceName);
+            if (wsOpt.isPresent()) {
+                Workspace ws = wsOpt.get();
+                boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
+                boolean hasWsPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
+                        .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
+                        .orElse(false);
+                if (!isWsOwner && !hasWsPerm) {
+                    throw new PermissionDeniedException("Access restricted: You do not have permission to add documents to workspace '" + workspaceName + "'");
+                }
             }
         }
 
@@ -200,6 +219,15 @@ public class DocumentService {
         }
 
         return document;
+    }
+
+    public void assertCanEditDocument(Long id, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(id);
+        Role effectiveRole = getEffectiveRole(document, user);
+        if (effectiveRole == null || effectiveRole == Role.VIEWER || effectiveRole == Role.RESTRICTED) {
+            throw new PermissionDeniedException("You do not have permission to edit this document");
+        }
     }
 
     public DocumentDetailResponse getDocumentDetail(Long id, String userEmail) {
@@ -286,7 +314,7 @@ public class DocumentService {
 
             String[] pSplits = content.split("(?i)</p>|\\n{2,}|<br\\s*/?>");
             paragraphCount = Math.max(1, (int) java.util.Arrays.stream(pSplits)
-                    .map(String::trim)
+                    .map(part -> part.trim())
                     .filter(s -> !s.isEmpty() && !s.replaceAll("<[^>]*>", "").isBlank())
                     .count());
 
@@ -328,15 +356,24 @@ public class DocumentService {
     }
 
     public List<Document> getAccessibleDocuments(String userEmail) {
-        return getAccessibleDocuments(userEmail, null);
+        return getAccessibleDocuments(userEmail, null, null);
     }
 
     public List<Document> getAccessibleDocuments(String userEmail, String typeStr) {
+        return getAccessibleDocuments(userEmail, typeStr, null);
+    }
+
+    public List<Document> getAccessibleDocuments(String userEmail, String typeStr, String workspaceFilter) {
         User user = getUserByEmail(userEmail);
         List<Document> allDocs = documentRepository.findAll();
 
         return allDocs.stream()
                 .filter(doc -> !doc.isTrashed())
+                .filter(doc -> {
+                    if (workspaceFilter == null || workspaceFilter.isBlank()) return true;
+                    if (doc.getWorkspaceName() == null) return false;
+                    return doc.getWorkspaceName().equalsIgnoreCase(workspaceFilter.trim());
+                })
                 .filter(doc -> getEffectiveRole(doc, user) != null)
                 .filter(doc -> {
                     if (typeStr == null || typeStr.isBlank()) return true;
@@ -412,12 +449,16 @@ public class DocumentService {
         permissionRepository.deleteAll(allPermissions);
 
         shareLinkRepository.deleteByDocument(document);
+        commentRepository.deleteByDocument(document);
 
         documentRepository.delete(document);
     }
 
     @Transactional
     public PermissionResponse shareDocument(Long documentId, String currentUserEmail, String targetUserEmail, Role role) {
+        if (role != Role.EDITOR && role != Role.VIEWER) {
+            throw new IllegalArgumentException("Documents can only be shared with EDITOR or VIEWER roles");
+        }
         return updateDocumentPermission(documentId, null, targetUserEmail, role, currentUserEmail);
     }
 
@@ -484,6 +525,9 @@ public class DocumentService {
 
     @Transactional
     public PermissionResponse updateDocumentPermission(Long documentId, Long targetUserId, String targetEmail, Role role, String requesterEmail) {
+        if (role != null && role != Role.EDITOR && role != Role.VIEWER && role != Role.RESTRICTED) {
+            throw new IllegalArgumentException("Document permissions can only use EDITOR, VIEWER, or RESTRICTED roles");
+        }
         User requester = getUserByEmail(requesterEmail);
         Document document = findDocumentById(documentId);
 
@@ -618,12 +662,16 @@ public class DocumentService {
             throw new PermissionDeniedException("Only the OWNER or ADMIN can generate share links");
         }
 
+        if (request.getRole() != Role.VIEWER && request.getRole() != Role.EDITOR) {
+            throw new IllegalArgumentException("Share links can only grant VIEWER or EDITOR permissions");
+        }
+
         shareLinkRepository.findByDocumentAndActiveTrue(document)
                 .ifPresent(l -> { l.setActive(false); shareLinkRepository.save(l); });
 
-        String token = java.util.UUID.randomUUID().toString().substring(0, 8);
+        String token = java.util.UUID.randomUUID().toString();
         java.time.LocalDateTime expiresAt = (request.getExpiresInDays() != null && request.getExpiresInDays() > 0)
-                ? java.time.LocalDateTime.now().plusDays(request.getExpiresInDays())
+            ? java.time.LocalDateTime.now().plusDays(Math.min(request.getExpiresInDays(), 30))
                 : null;
 
         com.example.syncpad.entity.ShareLink shareLink = new com.example.syncpad.entity.ShareLink(document, token, request.getRole(), expiresAt);
@@ -636,7 +684,7 @@ public class DocumentService {
     }
 
     @Transactional
-    public Document getDocumentByShareToken(String token, String currentUserEmail) {
+    public com.example.syncpad.dto.response.SharedDocumentResponse getDocumentByShareToken(String token, String currentUserEmail) {
         com.example.syncpad.entity.ShareLink shareLink = shareLinkRepository.findByToken(token)
                 .orElseThrow(() -> new DocumentNotFoundException("Share link not found or invalid"));
 
@@ -650,17 +698,7 @@ public class DocumentService {
 
         Document document = shareLink.getDocument();
 
-        if (currentUserEmail != null && !currentUserEmail.isBlank()) {
-            userRepository.findByEmail(currentUserEmail).ifPresent(user -> {
-                boolean hasPermission = permissionRepository.findByUserAndDocument(user, document).isPresent();
-                if (!hasPermission && !document.getOwner().getId().equals(user.getId())) {
-                    DocumentPermission perm = new DocumentPermission(user, document, shareLink.getRole());
-                    permissionRepository.save(perm);
-                }
-            });
-        }
-
-        return document;
+        return com.example.syncpad.dto.response.SharedDocumentResponse.fromEntity(document, shareLink.getRole());
     }
 
     @Transactional
@@ -716,6 +754,9 @@ public class DocumentService {
         if (request.getParentId() != null) {
             parent = commentRepository.findById(request.getParentId())
                     .orElseThrow(() -> new IllegalArgumentException("Parent comment not found"));
+            if (parent.getDocument() == null || !parent.getDocument().getId().equals(document.getId())) {
+                throw new IllegalArgumentException("Parent comment does not belong to this document");
+            }
         }
 
         com.example.syncpad.entity.DocumentComment comment = new com.example.syncpad.entity.DocumentComment(
@@ -742,6 +783,10 @@ public class DocumentService {
         com.example.syncpad.entity.DocumentComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
+        if (!comment.getDocument().getId().equals(documentId)) {
+            throw new IllegalArgumentException("Comment does not belong to the specified document");
+        }
+
         comment.setResolved(!comment.isResolved());
         comment.setUpdatedAt(java.time.LocalDateTime.now());
         com.example.syncpad.entity.DocumentComment updated = commentRepository.save(comment);
@@ -760,6 +805,10 @@ public class DocumentService {
 
         com.example.syncpad.entity.DocumentComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+
+        if (!comment.getDocument().getId().equals(documentId)) {
+            throw new IllegalArgumentException("Comment does not belong to the specified document");
+        }
 
         boolean isAuthor = comment.getAuthor().getId().equals(user.getId());
         boolean isOwnerOrAdmin = effectiveRole == Role.OWNER || effectiveRole == Role.ADMIN;

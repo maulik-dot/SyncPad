@@ -16,54 +16,70 @@ import com.example.syncpad.service.DocumentService;
 public class DocumentWebSocketController {
 
     private final DocumentService documentService;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    public DocumentWebSocketController(DocumentService documentService) {
+    public DocumentWebSocketController(DocumentService documentService, org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
         this.documentService = documentService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @MessageMapping("/documents/{documentId}/edit")
-    @SendTo("/topic/documents/{documentId}")
-    public DocumentEditMessage handleDocumentEdit(
+    public void handleDocumentEdit(
             @DestinationVariable Long documentId,
             @Payload DocumentEditMessage message,
             Principal principal,
             SimpMessageHeaderAccessor headerAccessor
     ) {
-        String senderEmail = principal != null ? principal.getName() : message.getSenderEmail();
+        if (principal == null || principal.getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket edit operation");
+        }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+
         message.setSenderEmail(senderEmail);
         message.setDocumentId(documentId);
 
-        return message;
+        messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/save")
-    @SendTo("/topic/documents/{documentId}")
-    public DocumentEditMessage handleDocumentSave(
+    public void handleDocumentSave(
             @DestinationVariable Long documentId,
             @Payload DocumentEditMessage message,
             Principal principal
     ) {
-        String senderEmail = principal != null ? principal.getName() : message.getSenderEmail();
-        if (senderEmail != null) {
-            documentService.updateDocument(documentId, message.getTitle(), message.getContent(), senderEmail);
+        if (principal == null || principal.getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket save operation");
         }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+        documentService.updateDocument(documentId, message.getTitle(), message.getContent(), senderEmail);
 
         message.setSenderEmail(senderEmail);
         message.setDocumentId(documentId);
         message.setType("SAVED");
-        return message;
+
+        messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/pdf-annotation")
-    @SendTo("/topic/documents/{documentId}/pdf-annotations")
-    public java.util.Map<String, Object> handlePdfAnnotation(
+    public void handlePdfAnnotation(
             @DestinationVariable Long documentId,
             @Payload java.util.Map<String, Object> message,
             Principal principal
     ) {
-        String senderEmail = principal != null ? principal.getName() : (String) message.get("senderEmail");
+        if (principal == null || principal.getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Unauthorized WebSocket annotation operation");
+        }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+
         message.put("senderEmail", senderEmail);
         message.put("documentId", documentId);
-        return message;
+
+        messagingTemplate.convertAndSend("/topic/documents." + documentId + ".pdf-annotations", (Object) message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/pdf-annotations", (Object) message);
     }
 }

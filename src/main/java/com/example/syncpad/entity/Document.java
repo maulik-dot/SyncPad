@@ -130,4 +130,5 @@ public class Document {
     public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
 
     public LocalDateTime getCreatedAt() { return createdAT; }
+    public Long getVersion() { return version; }
 }

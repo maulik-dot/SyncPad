@@ -127,9 +127,27 @@ public class FolderService {
 
         Folder parentFolder = null;
         if (parentFolderId != null) {
-            parentFolder = folderRepository.findById(parentFolderId).orElse(null);
-            if (parentFolder != null && workspaceName == null) {
+            parentFolder = folderRepository.findById(parentFolderId)
+                    .orElseThrow(() -> new IllegalArgumentException("Parent folder not found"));
+            if (getEffectiveRole(parentFolder, owner) == null) {
+                throw new PermissionDeniedException("Access restricted: You do not have permission to create folders inside this folder");
+            }
+            if (workspaceName == null || workspaceName.isBlank()) {
                 workspaceName = parentFolder.getWorkspaceName();
+            }
+        }
+
+        if (workspaceName != null && !workspaceName.isBlank()) {
+            java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(workspaceName);
+            if (wsOpt.isPresent()) {
+                Workspace ws = wsOpt.get();
+                boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
+                boolean hasWsPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
+                        .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
+                        .orElse(false);
+                if (!isWsOwner && !hasWsPerm) {
+                    throw new PermissionDeniedException("Access restricted: You do not have permission to add folders to this workspace");
+                }
             }
         }
 
@@ -211,8 +229,23 @@ public class FolderService {
         return folder;
     }
 
-    public List<Folder> getSubfolders(Long parentFolderId) {
-        return folderRepository.findByParentFolderId(parentFolderId);
+    public List<Folder> getSubfolders(Long parentFolderId, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Folder parentFolder = folderRepository.findById(parentFolderId)
+                .orElseThrow(() -> new RuntimeException("Folder not found: " + parentFolderId));
+
+        if (getEffectiveRole(parentFolder, user) == null) {
+            throw new PermissionDeniedException("Access restricted: You do not have permission to view this folder");
+        }
+
+        return folderRepository.findByParentFolderId(parentFolderId).stream()
+                .filter(sub -> getEffectiveRole(sub, user) != null)
+                .collect(Collectors.toList());
+    }
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
     public List<PermissionResponse> getFolderPermissions(Long folderId, String requesterEmail) {

@@ -1,6 +1,7 @@
 package com.example.syncpad.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -12,16 +13,23 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.syncpad.dto.request.AttachPdfRequest;
+import com.example.syncpad.dto.request.CreateCommentRequest;
 import com.example.syncpad.dto.request.CreateDocumentRequest;
-import com.example.syncpad.dto.request.RenameDocumentRequest;
+import com.example.syncpad.dto.request.CreateShareLinkRequest;
 import com.example.syncpad.dto.request.ShareDocumentRequest;
 import com.example.syncpad.dto.request.UpdateDocumentRequest;
+import com.example.syncpad.dto.response.DocumentCommentResponse;
 import com.example.syncpad.dto.response.DocumentDetailResponse;
+import com.example.syncpad.dto.response.DocumentResponse;
 import com.example.syncpad.dto.response.DocumentStatsResponse;
 import com.example.syncpad.dto.response.DocumentVersionResponse;
 import com.example.syncpad.dto.response.PermissionResponse;
+import com.example.syncpad.dto.response.ShareLinkResponse;
+import com.example.syncpad.dto.response.SharedDocumentResponse;
 import com.example.syncpad.entity.Document;
 import com.example.syncpad.entity.Role;
 import com.example.syncpad.service.DocumentService;
@@ -36,6 +44,14 @@ public class DocumentController {
 
     public DocumentController(DocumentService documentService) {
         this.documentService = documentService;
+    }
+
+    public static class RenameDocumentRequest {
+        @jakarta.validation.constraints.NotBlank(message = "Title cannot be blank")
+        private String title;
+
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
     }
 
     public static class UpdateDocumentPermissionRequest {
@@ -54,8 +70,8 @@ public class DocumentController {
     }
 
     @PostMapping
-    public Document createDocument(@Valid @RequestBody CreateDocumentRequest request, Authentication authentication) {
-        return documentService.createDocument(
+    public DocumentResponse createDocument(@Valid @RequestBody CreateDocumentRequest request, Authentication authentication) {
+        Document doc = documentService.createDocument(
                 request.getTitle(),
                 request.getContent(),
                 request.getFileType(),
@@ -63,23 +79,27 @@ public class DocumentController {
                 request.getWorkspaceName(),
                 authentication.getName()
         );
+        return DocumentResponse.from(doc);
     }
 
     @GetMapping
-    public List<Document> getAllDocuments(
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String type,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) Long folderId,
+    public List<DocumentResponse> getAllDocuments(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) Long folderId,
             Authentication authentication
     ) {
+        List<Document> docs;
         if (folderId != null) {
-            return documentService.getDocumentsByFolder(folderId, authentication.getName());
+            docs = documentService.getDocumentsByFolder(folderId, authentication.getName());
+        } else {
+            docs = documentService.getAccessibleDocuments(authentication.getName(), type);
         }
-        return documentService.getAccessibleDocuments(authentication.getName(), type);
+        return docs.stream().map(DocumentResponse::from).collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public Document getDocument(@PathVariable Long id, Authentication authentication) {
-        return documentService.getDocument(id, authentication.getName());
+    public DocumentResponse getDocument(@PathVariable Long id, Authentication authentication) {
+        return DocumentResponse.from(documentService.getDocument(id, authentication.getName()));
     }
 
     @GetMapping("/{id}/detail")
@@ -93,30 +113,30 @@ public class DocumentController {
     }
 
     @PatchMapping("/{id}/rename")
-    public Document renameDocumentPatch(
+    public DocumentResponse renameDocumentPatch(
             @PathVariable Long id,
             @Valid @RequestBody RenameDocumentRequest request,
             Authentication authentication
     ) {
-        return documentService.renameDocument(id, request.getTitle(), authentication.getName());
+        return DocumentResponse.from(documentService.renameDocument(id, request.getTitle(), authentication.getName()));
     }
 
     @PutMapping("/{id}/rename")
-    public Document renameDocumentPut(
+    public DocumentResponse renameDocumentPut(
             @PathVariable Long id,
             @Valid @RequestBody RenameDocumentRequest request,
             Authentication authentication
     ) {
-        return documentService.renameDocument(id, request.getTitle(), authentication.getName());
+        return DocumentResponse.from(documentService.renameDocument(id, request.getTitle(), authentication.getName()));
     }
 
     @PutMapping("/{id}")
-    public Document updateDocument(
+    public DocumentResponse updateDocument(
             @PathVariable Long id,
             @Valid @RequestBody UpdateDocumentRequest request,
             Authentication authentication
     ) {
-        return documentService.updateDocument(id, request.getTitle(), request.getContent(), authentication.getName());
+        return DocumentResponse.from(documentService.updateDocument(id, request.getTitle(), request.getContent(), authentication.getName()));
     }
 
     @DeleteMapping("/{id}")
@@ -174,25 +194,25 @@ public class DocumentController {
     }
 
     @PostMapping("/{id}/restore/{versionNumber}")
-    public Document restoreVersion(
+    public DocumentResponse restoreVersion(
             @PathVariable Long id,
             @PathVariable Integer versionNumber,
             Authentication authentication
     ) {
-        return documentService.restoreVersion(id, versionNumber, authentication.getName());
+        return DocumentResponse.from(documentService.restoreVersion(id, versionNumber, authentication.getName()));
     }
 
     @PostMapping("/{id}/share-link")
-    public com.example.syncpad.dto.response.ShareLinkResponse generateShareLink(
+    public ShareLinkResponse generateShareLink(
             @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody com.example.syncpad.dto.request.CreateShareLinkRequest request,
+            @Valid @RequestBody CreateShareLinkRequest request,
             Authentication authentication
     ) {
         return documentService.generateShareLink(id, authentication.getName(), request);
     }
 
     @GetMapping("/share/{token}")
-    public Document getDocumentByShareToken(
+    public SharedDocumentResponse getDocumentByShareToken(
             @PathVariable String token,
             Authentication authentication
     ) {
@@ -214,7 +234,7 @@ public class DocumentController {
     // ==========================================
 
     @GetMapping("/{id}/comments")
-    public List<com.example.syncpad.dto.response.DocumentCommentResponse> getComments(
+    public List<DocumentCommentResponse> getComments(
             @PathVariable Long id,
             Authentication authentication
     ) {
@@ -222,16 +242,16 @@ public class DocumentController {
     }
 
     @PostMapping("/{id}/comments")
-    public com.example.syncpad.dto.response.DocumentCommentResponse createComment(
+    public DocumentCommentResponse createComment(
             @PathVariable Long id,
-            @Valid @RequestBody com.example.syncpad.dto.request.CreateCommentRequest request,
+            @Valid @RequestBody CreateCommentRequest request,
             Authentication authentication
     ) {
         return documentService.createComment(id, authentication.getName(), request);
     }
 
     @PatchMapping("/{id}/comments/{commentId}/resolve")
-    public com.example.syncpad.dto.response.DocumentCommentResponse resolveComment(
+    public DocumentCommentResponse resolveComment(
             @PathVariable Long id,
             @PathVariable Long commentId,
             Authentication authentication
@@ -254,19 +274,19 @@ public class DocumentController {
     // ==========================================
 
     @PostMapping("/{id}/pdf")
-    public Document attachPdf(
+    public DocumentResponse attachPdf(
             @PathVariable Long id,
-            @Valid @RequestBody com.example.syncpad.dto.request.AttachPdfRequest request,
+            @Valid @RequestBody AttachPdfRequest request,
             Authentication authentication
     ) {
-        return documentService.attachPdf(id, request.getFileName(), request.getPdfUrl(), authentication.getName());
+        return DocumentResponse.from(documentService.attachPdf(id, request.getFileName(), request.getPdfUrl(), authentication.getName()));
     }
 
     @DeleteMapping("/{id}/pdf")
-    public Document detachPdf(
+    public DocumentResponse detachPdf(
             @PathVariable Long id,
             Authentication authentication
     ) {
-        return documentService.detachPdf(id, authentication.getName());
+        return DocumentResponse.from(documentService.detachPdf(id, authentication.getName()));
     }
 }

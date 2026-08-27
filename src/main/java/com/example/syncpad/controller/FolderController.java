@@ -1,6 +1,7 @@
 package com.example.syncpad.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.syncpad.dto.request.ShareDocumentRequest;
+import com.example.syncpad.dto.response.FolderResponse;
 import com.example.syncpad.dto.response.PermissionResponse;
 import com.example.syncpad.entity.Folder;
 import com.example.syncpad.entity.FolderPermission;
@@ -62,24 +63,24 @@ public class FolderController {
     }
 
     @PostMapping
-    public ResponseEntity<Folder> createFolder(@RequestBody CreateFolderRequest request, Authentication authentication) {
+    public ResponseEntity<FolderResponse> createFolder(@RequestBody CreateFolderRequest request, Authentication authentication) {
         Folder folder = folderService.createFolder(
                 request.getName(),
                 request.getWorkspaceName(),
                 request.getParentFolderId(),
                 authentication.getName()
         );
-        return ResponseEntity.ok(folder);
+        return ResponseEntity.ok(FolderResponse.from(folder));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Folder> updateFolder(
+    public ResponseEntity<FolderResponse> updateFolder(
             @PathVariable Long id,
             @RequestBody CreateFolderRequest request,
             Authentication authentication
     ) {
         Folder folder = folderService.updateFolder(id, request.getName(), authentication.getName());
-        return ResponseEntity.ok(folder);
+        return ResponseEntity.ok(FolderResponse.from(folder));
     }
 
     @DeleteMapping("/{id}")
@@ -89,28 +90,32 @@ public class FolderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Folder> getFolder(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(folderService.getFolder(id, authentication.getName()));
+    public ResponseEntity<FolderResponse> getFolder(@PathVariable Long id, Authentication authentication) {
+        Folder folder = folderService.getFolder(id, authentication.getName());
+        return ResponseEntity.ok(FolderResponse.from(folder));
     }
 
     @GetMapping
-    public ResponseEntity<List<Folder>> getFolders(
+    public ResponseEntity<List<FolderResponse>> getFolders(
             @RequestParam(required = false) String workspace,
             Authentication authentication
     ) {
         String userEmail = (authentication != null) ? authentication.getName() : null;
+        List<Folder> folders;
         if (workspace != null && !workspace.isBlank()) {
-            return ResponseEntity.ok(folderService.getFoldersByWorkspace(workspace, userEmail));
+            folders = folderService.getFoldersByWorkspace(workspace, userEmail);
+        } else if (userEmail != null) {
+            folders = folderService.getUserFolders(userEmail);
+        } else {
+            folders = List.of();
         }
-        if (userEmail != null) {
-            return ResponseEntity.ok(folderService.getUserFolders(userEmail));
-        }
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(folders.stream().map(FolderResponse::from).collect(Collectors.toList()));
     }
 
     @GetMapping("/{id}/subfolders")
-    public ResponseEntity<List<Folder>> getSubfolders(@PathVariable Long id) {
-        return ResponseEntity.ok(folderService.getSubfolders(id));
+    public ResponseEntity<List<FolderResponse>> getSubfolders(@PathVariable Long id, Authentication authentication) {
+        List<Folder> subfolders = folderService.getSubfolders(id, authentication.getName());
+        return ResponseEntity.ok(subfolders.stream().map(FolderResponse::from).collect(Collectors.toList()));
     }
 
     @GetMapping("/{id}/permissions")

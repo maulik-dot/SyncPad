@@ -1,6 +1,7 @@
 package com.example.syncpad.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -13,10 +14,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.syncpad.entity.Document;
+import com.example.syncpad.dto.response.DocumentResponse;
+import com.example.syncpad.dto.response.NotificationResponse;
+import com.example.syncpad.dto.response.PermissionResponse;
+import com.example.syncpad.dto.response.WorkspaceResponse;
 import com.example.syncpad.entity.Role;
 import com.example.syncpad.entity.Workspace;
 import com.example.syncpad.entity.WorkspacePermission;
+import com.example.syncpad.service.NotificationService;
 import com.example.syncpad.service.WorkspaceService;
 
 @RestController
@@ -24,9 +29,9 @@ import com.example.syncpad.service.WorkspaceService;
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
-    private final com.example.syncpad.service.NotificationService notificationService;
+    private final NotificationService notificationService;
 
-    public WorkspaceController(WorkspaceService workspaceService, com.example.syncpad.service.NotificationService notificationService) {
+    public WorkspaceController(WorkspaceService workspaceService, NotificationService notificationService) {
         this.workspaceService = workspaceService;
         this.notificationService = notificationService;
     }
@@ -58,23 +63,30 @@ public class WorkspaceController {
     }
 
     @PostMapping
-    public ResponseEntity<Workspace> createWorkspace(@RequestBody CreateWorkspaceRequest request, Authentication authentication) {
+    public ResponseEntity<WorkspaceResponse> createWorkspace(@RequestBody CreateWorkspaceRequest request, Authentication authentication) {
         Workspace workspace = workspaceService.createWorkspace(
                 request.getName(),
                 request.getDescription(),
                 request.getColor(),
                 authentication.getName()
         );
-        return ResponseEntity.ok(workspace);
+        return ResponseEntity.ok(WorkspaceResponse.from(workspace, Role.OWNER));
     }
 
     @GetMapping
-    public ResponseEntity<List<Workspace>> getWorkspaces(Authentication authentication) {
-        return ResponseEntity.ok(workspaceService.getUserWorkspaces(authentication.getName()));
+    public ResponseEntity<List<WorkspaceResponse>> getWorkspaces(Authentication authentication) {
+        List<Workspace> workspaces = workspaceService.getUserWorkspaces(authentication.getName());
+        List<WorkspaceResponse> response = workspaces.stream()
+                .map(ws -> {
+                    Role role = workspaceService.getUserRoleInWorkspace(ws.getId(), authentication.getName());
+                    return WorkspaceResponse.from(ws, role);
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Workspace> updateWorkspace(
+    public ResponseEntity<WorkspaceResponse> updateWorkspace(
             @PathVariable Long id,
             @RequestBody CreateWorkspaceRequest request,
             Authentication authentication
@@ -82,7 +94,8 @@ public class WorkspaceController {
         Workspace workspace = workspaceService.updateWorkspace(
                 id, request.getName(), request.getDescription(), request.getColor(), authentication.getName()
         );
-        return ResponseEntity.ok(workspace);
+        Role role = workspaceService.getUserRoleInWorkspace(id, authentication.getName());
+        return ResponseEntity.ok(WorkspaceResponse.from(workspace, role));
     }
 
     @DeleteMapping("/{id}")
@@ -92,19 +105,19 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{id}/invite")
-    public ResponseEntity<com.example.syncpad.dto.response.NotificationResponse> inviteToWorkspace(
+    public ResponseEntity<NotificationResponse> inviteToWorkspace(
             @PathVariable Long id,
             @RequestBody ShareWorkspaceRequest request,
             Authentication authentication
     ) {
-        com.example.syncpad.dto.response.NotificationResponse response = notificationService.sendWorkspaceInvite(
+        NotificationResponse response = notificationService.sendWorkspaceInvite(
                 id, authentication.getName(), request.getEmail(), request.getRole() != null ? request.getRole() : Role.EDITOR
         );
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/share")
-    public ResponseEntity<WorkspacePermission> shareWorkspace(
+    public ResponseEntity<PermissionResponse> shareWorkspace(
             @PathVariable Long id,
             @RequestBody ShareWorkspaceRequest request,
             Authentication authentication
@@ -112,12 +125,28 @@ public class WorkspaceController {
         WorkspacePermission permission = workspaceService.shareWorkspace(
                 id, authentication.getName(), request.getEmail(), request.getRole() != null ? request.getRole() : Role.EDITOR
         );
-        return ResponseEntity.ok(permission);
+        return ResponseEntity.ok(new PermissionResponse(
+                permission.getId(),
+                permission.getUser().getId(),
+                permission.getUser().getEmail(),
+                permission.getUser().getName(),
+                permission.getRole()
+        ));
     }
 
     @GetMapping("/{id}/members")
-    public ResponseEntity<List<WorkspacePermission>> getMembers(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(workspaceService.getWorkspaceMembers(id, authentication.getName()));
+    public ResponseEntity<List<PermissionResponse>> getMembers(@PathVariable Long id, Authentication authentication) {
+        List<WorkspacePermission> members = workspaceService.getWorkspaceMembers(id, authentication.getName());
+        List<PermissionResponse> response = members.stream()
+                .map(p -> new PermissionResponse(
+                        p.getId(),
+                        p.getUser().getId(),
+                        p.getUser().getEmail(),
+                        p.getUser().getName(),
+                        p.getRole()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 
     public static class UpdateRoleRequest {
@@ -127,7 +156,7 @@ public class WorkspaceController {
     }
 
     @PutMapping("/{id}/members/{userId}/role")
-    public ResponseEntity<WorkspacePermission> updateMemberRole(
+    public ResponseEntity<PermissionResponse> updateMemberRole(
             @PathVariable Long id,
             @PathVariable Long userId,
             @RequestBody UpdateRoleRequest request,
@@ -136,7 +165,13 @@ public class WorkspaceController {
         WorkspacePermission permission = workspaceService.updateMemberRole(
                 id, userId, request.getRole(), authentication.getName()
         );
-        return ResponseEntity.ok(permission);
+        return ResponseEntity.ok(new PermissionResponse(
+                permission.getId(),
+                permission.getUser().getId(),
+                permission.getUser().getEmail(),
+                permission.getUser().getName(),
+                permission.getRole()
+        ));
     }
 
     @DeleteMapping("/{id}/members/{userId}")
@@ -146,7 +181,11 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{id}/recent-files")
-    public ResponseEntity<List<Document>> getRecentFiles(@PathVariable Long id) {
-        return ResponseEntity.ok(workspaceService.getWorkspaceRecentFiles(id));
+    public ResponseEntity<List<DocumentResponse>> getRecentFiles(@PathVariable Long id, Authentication authentication) {
+        List<DocumentResponse> response = workspaceService.getWorkspaceRecentFiles(id, authentication.getName())
+                .stream()
+                .map(DocumentResponse::from)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
     }
 }

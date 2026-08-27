@@ -17,7 +17,9 @@ import com.example.syncpad.entity.User;
 import com.example.syncpad.entity.Workspace;
 import com.example.syncpad.entity.WorkspacePermission;
 import com.example.syncpad.exception.PermissionDeniedException;
+import com.example.syncpad.repository.DocumentPermissionRepository;
 import com.example.syncpad.repository.DocumentRepository;
+import com.example.syncpad.repository.FolderPermissionRepository;
 import com.example.syncpad.repository.NotificationRepository;
 import com.example.syncpad.repository.UserRepository;
 import com.example.syncpad.repository.WorkspacePermissionRepository;
@@ -30,6 +32,12 @@ public class WorkspaceService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final WorkspacePermissionRepository workspacePermissionRepository;
+    private final DocumentPermissionRepository documentPermissionRepository;
+    private final FolderPermissionRepository folderPermissionRepository;
+    private final com.example.syncpad.repository.FolderRepository folderRepository;
+    private final com.example.syncpad.repository.DocumentVersionRepository documentVersionRepository;
+    private final com.example.syncpad.repository.ShareLinkRepository shareLinkRepository;
+    private final com.example.syncpad.repository.DocumentCommentRepository documentCommentRepository;
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -39,6 +47,12 @@ public class WorkspaceService {
             UserRepository userRepository,
             DocumentRepository documentRepository,
             WorkspacePermissionRepository workspacePermissionRepository,
+            DocumentPermissionRepository documentPermissionRepository,
+            FolderPermissionRepository folderPermissionRepository,
+            com.example.syncpad.repository.FolderRepository folderRepository,
+            com.example.syncpad.repository.DocumentVersionRepository documentVersionRepository,
+            com.example.syncpad.repository.ShareLinkRepository shareLinkRepository,
+            com.example.syncpad.repository.DocumentCommentRepository documentCommentRepository,
             NotificationRepository notificationRepository,
             SimpMessagingTemplate messagingTemplate,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder
@@ -47,6 +61,12 @@ public class WorkspaceService {
         this.userRepository = userRepository;
         this.documentRepository = documentRepository;
         this.workspacePermissionRepository = workspacePermissionRepository;
+        this.documentPermissionRepository = documentPermissionRepository;
+        this.folderPermissionRepository = folderPermissionRepository;
+        this.folderRepository = folderRepository;
+        this.documentVersionRepository = documentVersionRepository;
+        this.shareLinkRepository = shareLinkRepository;
+        this.documentCommentRepository = documentCommentRepository;
         this.notificationRepository = notificationRepository;
         this.messagingTemplate = messagingTemplate;
         this.passwordEncoder = passwordEncoder;
@@ -60,6 +80,12 @@ public class WorkspaceService {
         return workspacePermissionRepository.findByUserAndWorkspace(user, workspace)
                 .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN)
                 .orElse(false);
+    }
+
+    private void validateMemberRole(Role role) {
+        if (role != Role.EDITOR && role != Role.VIEWER) {
+            throw new IllegalArgumentException("Workspace members can only be assigned EDITOR or VIEWER roles");
+        }
     }
 
     @Transactional
@@ -118,6 +144,22 @@ public class WorkspaceService {
         return workspace;
     }
 
+    public Role getUserRoleInWorkspace(Long workspaceId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new RuntimeException("Workspace not found: " + workspaceId));
+
+        if (workspace.getOwner() != null && workspace.getOwner().getId().equals(user.getId())) {
+            return Role.OWNER;
+        }
+
+        return workspacePermissionRepository.findByUserAndWorkspace(user, workspace)
+                .map(WorkspacePermission::getRole)
+                .orElse(null);
+    }
+
     @Transactional
     public Workspace updateWorkspace(Long workspaceId, String name, String description, String color, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
@@ -154,6 +196,24 @@ public class WorkspaceService {
             throw new PermissionDeniedException("Only Workspace Admin can delete this workspace");
         }
 
+        // 1. Cascade delete all documents belonging to this workspace
+        List<com.example.syncpad.entity.Document> workspaceDocs = documentRepository.findByWorkspaceName(workspace.getName());
+        for (com.example.syncpad.entity.Document doc : workspaceDocs) {
+            documentVersionRepository.findByDocumentOrderByVersionNumberDesc(doc).forEach(documentVersionRepository::delete);
+            documentPermissionRepository.findByDocument(doc).forEach(documentPermissionRepository::delete);
+            shareLinkRepository.deleteByDocument(doc);
+            documentCommentRepository.deleteByDocument(doc);
+            documentRepository.delete(doc);
+        }
+
+        // 2. Cascade delete all folders belonging to this workspace
+        List<com.example.syncpad.entity.Folder> folders = folderRepository.findByWorkspaceName(workspace.getName());
+        for (com.example.syncpad.entity.Folder folder : folders) {
+            folderPermissionRepository.deleteByFolder(folder);
+            folderRepository.delete(folder);
+        }
+
+        // 3. Delete notifications, permissions, and workspace
         notificationRepository.deleteByWorkspace(workspace);
         List<WorkspacePermission> permissions = workspacePermissionRepository.findByWorkspace(workspace);
         workspacePermissionRepository.deleteAll(permissions);
@@ -162,6 +222,7 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspacePermission shareWorkspace(Long workspaceId, String ownerEmail, String targetEmail, Role role) {
+        validateMemberRole(role);
         User owner = userRepository.findByEmail(ownerEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + ownerEmail));
 
@@ -190,8 +251,15 @@ public class WorkspaceService {
     }
 
     public List<WorkspacePermission> getWorkspaceMembers(Long workspaceId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new RuntimeException("Workspace not found: " + workspaceId));
+
+        if (!isUserAdmin(workspace, user) && workspacePermissionRepository.findByUserAndWorkspace(user, workspace).isEmpty()) {
+            throw new PermissionDeniedException("Access restricted: You do not have permission to view members of this workspace");
+        }
 
         return workspacePermissionRepository.findByWorkspace(workspace);
     }
@@ -224,6 +292,7 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspacePermission updateMemberRole(Long workspaceId, Long memberUserId, Role newRole, String requesterEmail) {
+        validateMemberRole(newRole);
         User requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + requesterEmail));
 
@@ -277,7 +346,23 @@ public class WorkspaceService {
         return savedPermission;
     }
 
-    public List<Document> getWorkspaceRecentFiles(Long workspaceId) {
-        return documentRepository.findAll();
+    public List<Document> getWorkspaceRecentFiles(Long workspaceId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new RuntimeException("Workspace not found: " + workspaceId));
+
+        if (!isUserAdmin(workspace, user) && workspacePermissionRepository.findByUserAndWorkspace(user, workspace).isEmpty()) {
+            throw new PermissionDeniedException("Access restricted: You do not have permission to view this workspace");
+        }
+
+        return documentRepository.findAll().stream()
+                .filter(doc -> !doc.isTrashed())
+                .filter(doc -> workspace.getName().equalsIgnoreCase(doc.getWorkspaceName()))
+                .filter(doc -> isUserAdmin(workspace, user) || documentPermissionRepository.findByUserAndDocument(user, doc).isPresent() || (doc.getFolder() != null && folderPermissionRepository.findByUserAndFolder(user, doc.getFolder()).isPresent()))
+                .sorted(java.util.Comparator.comparing(Document::getUpdatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .limit(20)
+                .collect(Collectors.toList());
     }
 }

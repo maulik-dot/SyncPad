@@ -12,6 +12,7 @@ import com.example.syncpad.entity.DocumentComment;
 public interface DocumentCommentRepository extends JpaRepository<DocumentComment, Long> {
     List<DocumentComment> findByDocumentAndParentIsNullOrderByCreatedAtAsc(Document document);
     List<DocumentComment> findByDocumentOrderByCreatedAtAsc(Document document);
+    void deleteByDocument(Document document);
     long countByDocument(Document document);
     long countByDocumentAndResolvedFalse(Document document);
 }

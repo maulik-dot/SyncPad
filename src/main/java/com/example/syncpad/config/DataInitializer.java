@@ -44,11 +44,14 @@ public class DataInitializer implements CommandLineRunner {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.seed-demo-user:false}")
+    private boolean seedDemoUser;
+
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        if (userRepository.findByEmail("demo@syncpad.com").isEmpty()) {
-            // Seed Demo User account for clean testing
+        if (seedDemoUser && userRepository.findByEmail("demo@syncpad.com").isEmpty()) {
+            // Seed Demo User account for development testing if explicitly enabled
             User user = new User("Alex Morgan", "demo@syncpad.com", passwordEncoder.encode("password123"));
             userRepository.save(user);
         }
