@@ -1,0 +1,12 @@
+[Unit]
+Description=Run SyncPad Encrypted Database Backup Daily
+RefuseManualStart=no
+RefuseManualStop=no
+
+[Timer]
+Persistent=true
+OnCalendar=*-*-* 02:00:00
+Unit=syncpad-backup.service
+
+[Install]
+WantedBy=timers.target

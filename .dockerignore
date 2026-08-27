@@ -1,0 +1,10 @@
+target/
+.git
+.gitignore
+.env
+.env.*
+node_modules/
+Document Workspace Design/node_modules/
+Document Workspace Design/dist/
+backups/
+*.log

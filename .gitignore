@@ -31,3 +31,17 @@ build/
 
 ### VS Code ###
 .vscode/
+.env
+.env.*
+!.env.example
+
+# Database backups
+backups/
+*.sql.gz
+*.sql.gz.enc
+*.enc
+*.sha256
+
+# Local TLS Certificates & Keys
+nginx/ssl/
+!nginx/ssl/.gitkeep
