@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncpad-rabbitmq
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-rabbitmq
+    app.kubernetes.io/component: message-broker
+spec:
+  type: ClusterIP
+  ports:
+    - port: 61613
+      targetPort: 61613
+      name: stomp
+    - port: 5672
+      targetPort: 5672
+      name: amqp
+    - port: 15672
+      targetPort: 15672
+      name: management
+  selector:
+    app.kubernetes.io/name: syncpad-rabbitmq
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: syncpad-rabbitmq
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-rabbitmq
+    app.kubernetes.io/component: message-broker
+spec:
+  serviceName: syncpad-rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: syncpad-rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: syncpad-rabbitmq
+        app.kubernetes.io/component: message-broker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: syncpad
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: syncpad-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS
+              value: "-rabbitmq_stomp default_user [\"syncpad\"]"
+          command:
+            - "sh"
+            - "-c"
+            - "rabbitmq-plugins enable --offline rabbitmq_stomp rabbitmq_management && exec docker-entrypoint.sh rabbitmq-server"
+          ports:
+            - containerPort: 61613
+              name: stomp
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 1000m
+              memory: 768Mi
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "status"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

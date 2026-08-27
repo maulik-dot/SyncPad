@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: syncpad-config
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad
+    app.kubernetes.io/component: config
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  SERVER_PORT: "8082"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://syncpad-postgres:5432/syncpad_db"
+  SPRING_DATASOURCE_USERNAME: "syncpad_user"
+  SPRING_FLYWAY_ENABLED: "true"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+  SPRING_WEBSOCKET_RELAY_ENABLED: "true"
+  SPRING_WEBSOCKET_RELAY_HOST: "syncpad-rabbitmq"
+  SPRING_WEBSOCKET_RELAY_PORT: "61613"
+  RABBITMQ_USER: "syncpad"
+  ALLOWED_ORIGINS: "https://syncpad.yourdomain.com,https://localhost"
+  JWT_EXPIRATION: "86400000"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncpad-backend
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-backend
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8082
+      name: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: syncpad-backend

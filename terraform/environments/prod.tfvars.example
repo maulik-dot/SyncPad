@@ -1,0 +1,10 @@
+aws_region               = "us-east-1"
+environment              = "prod"
+project_name             = "syncpad"
+domain_name              = "syncpad.example.com"
+vpc_cidr                 = "10.0.0.0/16"
+db_instance_class        = "db.t4g.medium"
+db_allocated_storage     = 50
+db_max_allocated_storage = 200
+backup_retention_days    = 14
+multi_az                 = true

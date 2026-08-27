@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncpad-postgres
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgresql
+  selector:
+    app.kubernetes.io/name: syncpad-postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: syncpad-postgres
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-postgres
+    app.kubernetes.io/component: database
+spec:
+  serviceName: syncpad-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: syncpad-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: syncpad-postgres
+        app.kubernetes.io/component: database
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: POSTGRES_DB
+              value: syncpad_db
+            - name: POSTGRES_USER
+              value: syncpad_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: syncpad-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+              name: postgresql
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command: ["psql", "-U", "syncpad_user", "-d", "syncpad_db", "-c", "SELECT 1"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "syncpad_user", "-d", "syncpad_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
