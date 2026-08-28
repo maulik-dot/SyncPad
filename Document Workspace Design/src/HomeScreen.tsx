@@ -201,7 +201,7 @@ export default function HomeScreen({
         members: (ws.permissions?.length || 0) + 1,
         files: docList.filter(d => d.workspaceName === ws.name).length,
         color: ws.color || colors[index % colors.length],
-        initial: ws.name[0]?.toUpperCase() || 'W',
+        initial: (ws.name?.trim().charAt(0) || 'W').toUpperCase(),
         updatedAt: ws.updatedAt ? new Date(ws.updatedAt).toLocaleDateString() : 'Active',
         role: ws.role === 'OWNER' || ws.currentUserRole === 'OWNER' ? 'Admin' : 'Member',
       }))
@@ -216,8 +216,8 @@ export default function HomeScreen({
           name: doc.title,
           workspace: doc.workspaceName || 'General',
           type: fileType,
-          modifiedAt: doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
-          modifiedBy: doc.owner?.name?.[0]?.toUpperCase() || 'U',
+          modifiedAt: doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : 'Recently',
+          modifiedBy: (doc.owner?.name?.trim().charAt(0) || 'U').toUpperCase(),
           avatarColor: '#5b7fa6',
           documentObj: doc,
         }

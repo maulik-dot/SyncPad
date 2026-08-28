@@ -1,5 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082'
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? (typeof window !== 'undefined' && window.location.port === '8443' ? 'http://localhost:8082' : '')
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 export function getAuthToken(): string | null {
   return localStorage.getItem('syncpad_token')

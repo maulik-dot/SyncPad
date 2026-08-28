@@ -17,18 +17,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('syncpad_user')
-    return saved ? JSON.parse(saved) : null
     try {
       const saved = localStorage.getItem('syncpad_user')
-      if (saved && saved !== 'undefined' && saved !== 'null') {
-        return JSON.parse(saved)
-      }
+      if (!saved || saved === 'undefined' || saved === 'null') return null
+      return JSON.parse(saved)
     } catch (e) {
-      console.warn('Invalid cached user session:', e)
+      console.warn('Failed to parse saved user from localStorage', e)
       localStorage.removeItem('syncpad_user')
+      return null
     }
-    return null
   })
   const [token, setToken] = useState<string | null>(() => getAuthToken())
 
