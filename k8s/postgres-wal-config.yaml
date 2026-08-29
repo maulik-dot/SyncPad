@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-wal-config
+  namespace: syncpad
+  labels:
+    app.kubernetes.io/name: syncpad-postgres
+    app.kubernetes.io/component: database-ha
+data:
+  # =========================================================================
+  # POSTGRESQL 16 HIGH AVAILABILITY & WAL ARCHIVING (PITR) CONFIGURATION
+  # =========================================================================
+  postgresql.conf: |
+    # Enable WAL archiving for Point-in-Time Recovery
+    wal_level = replica
+    archive_mode = on
+    archive_timeout = 60
+    
+    # Archiving command:
+    # 1. For Local Persistent Volume:
+    archive_command = 'test ! -f /var/lib/postgresql/wal_archive/%f && cp %p /var/lib/postgresql/wal_archive/%f'
+    
+    # 2. For AWS S3 (Uncomment in AWS EKS environments):
+    # archive_command = 'aws s3 cp %p s3://${WAL_S3_BUCKET}/syncpad/wal/%f --storage-class STANDARD_IA'
+    
+    # 3. For Google Cloud Storage (Uncomment in GCP GKE environments):
+    # archive_command = 'gcloud storage cp %p gs://${WAL_GCS_BUCKET}/syncpad/wal/%f'
+
+    # Streaming Replication Settings for Read Replicas
+    max_wal_senders = 10
+    max_replication_slots = 10
+    hot_standby = on
+    hot_standby_feedback = on
+
+  recovery.signal: ""
+
+  # PITR Recovery target settings (used when restoring)
+  # restore_command = 'cp /var/lib/postgresql/wal_archive/%f %p'
+  # recovery_target_time = '2026-08-29 14:00:00 UTC'
+  # recovery_target_action = 'promote'
+
