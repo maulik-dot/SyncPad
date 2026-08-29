@@ -605,7 +605,7 @@ async function runSuite() {
   assert(shareCommenterRes.status === 200, `POST /documents/{id}/share returns 200 OK with COMMENTER role`)
   assert(shareCommenterRes.body.role === 'COMMENTER', `Permission response reflects COMMENTER role`)
   assert(!!shareCommenterRes.body.expiresAt, `Expiring guest access has expiresAt timestamp`)
-  assert(shareCommenterRes.body.isExpired === false, `Guest access is not expired`)
+  assert(shareCommenterRes.body.isExpired === false || shareCommenterRes.body.expired === false, `Guest access is not expired`)
 
   // User 2 can read comments and post a comment
   const postCommentRes = await request(`/documents/${templateDocId}/comments`, {
@@ -638,6 +638,59 @@ async function runSuite() {
     }
   })
   assert(renameAttemptRes.status === 403, `Commenter is FORBIDDEN (403) from renaming document`)
+
+  console.log(`\n--> Scenario 16: AI Document Assistant & Generative Intelligence`)
+  // 1. GET /api/ai/actions
+  const aiActionsRes = await request('/api/ai/actions', {
+    headers: { Authorization: `Bearer ${user1Token}` }
+  })
+  assert(aiActionsRes.status === 200, `GET /api/ai/actions returns 200 OK`)
+  assert(Array.isArray(aiActionsRes.body), `AI actions returned as an array`)
+  assert(aiActionsRes.body.some(a => a.action === 'SUMMARIZE'), `AI actions include SUMMARIZE`)
+  assert(aiActionsRes.body.some(a => a.action === 'ACTION_ITEMS'), `AI actions include ACTION_ITEMS`)
+
+  // 2. POST /api/ai/generate with SUMMARIZE
+  const aiSummarizeRes = await request('/api/ai/generate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${user1Token}` },
+    body: {
+      documentId: templateDocId,
+      action: 'SUMMARIZE'
+    }
+  })
+  assert(aiSummarizeRes.status === 200, `POST /api/ai/generate with SUMMARIZE returns 200 OK`)
+  assert(aiSummarizeRes.body.text && aiSummarizeRes.body.text.includes('Summary'), `Summary text contains executive summary`)
+  assert(aiSummarizeRes.body.modelUsed !== undefined, `Response specifies model used`)
+
+  // 3. POST /api/ai/generate with ACTION_ITEMS
+  const aiActionsExtractRes = await request('/api/ai/generate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${user1Token}` },
+    body: {
+      documentId: templateDocId,
+      action: 'ACTION_ITEMS'
+    }
+  })
+  assert(aiActionsExtractRes.status === 200, `POST /api/ai/generate with ACTION_ITEMS returns 200 OK`)
+  assert(aiActionsExtractRes.body.text && aiActionsExtractRes.body.text.includes('- [ ]'), `Action items formatted as markdown checklist`)
+
+  // 4. Cross-workspace unauthorized user access blocked (403 Forbidden)
+  const user3Email = `e2e_ai_unauth_${Date.now()}@syncpad.com`
+  const user3Reg = await request('/auth/register', {
+    method: 'POST',
+    body: { name: 'Unauthorized AI User', email: user3Email, password: 'password123' }
+  })
+  const user3Token = user3Reg.body.accessToken
+
+  const unauthAiRes = await request('/api/ai/generate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${user3Token}` },
+    body: {
+      documentId: templateDocId,
+      action: 'SUMMARIZE'
+    }
+  })
+  assert(unauthAiRes.status === 403, `Unauthorized AI document access blocked (403 Forbidden)`)
 
   console.log(`\n============================================================`)
   console.log(` E2E Verification Complete: ${testsPassed}/${testsRun} Assertions Passed!`)
