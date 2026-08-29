@@ -12,6 +12,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 
 import com.example.syncpad.dto.message.DocumentEditMessage;
+import java.util.concurrent.ConcurrentHashMap;
+import com.example.syncpad.crdt.CrdtDocumentEngine;
+import com.example.syncpad.crdt.CrdtOperation;
 import com.example.syncpad.service.DocumentService;
 
 @Controller
@@ -19,10 +22,45 @@ public class DocumentWebSocketController {
 
     private final DocumentService documentService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ConcurrentHashMap<Long, CrdtDocumentEngine> crdtEngines = new ConcurrentHashMap<>();
 
     public DocumentWebSocketController(DocumentService documentService, SimpMessagingTemplate messagingTemplate) {
         this.documentService = documentService;
         this.messagingTemplate = messagingTemplate;
+    }
+
+    @MessageMapping("/documents/{documentId}/crdt")
+    public void handleCrdtOperation(
+            @DestinationVariable Long documentId,
+            @Payload CrdtOperation operation,
+            Principal principal
+    ) {
+        if (principal == null || principal.getName() == null) {
+            throw new AccessDeniedException("Unauthorized WebSocket CRDT operation");
+        }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+
+        operation.setSenderEmail(senderEmail);
+        operation.setDocumentId(documentId);
+
+        // Update server-side CRDT state
+        CrdtDocumentEngine engine = crdtEngines.computeIfAbsent(documentId, id -> {
+            CrdtDocumentEngine newEngine = new CrdtDocumentEngine(id);
+            try {
+                var doc = documentService.getDocument(id, senderEmail);
+                if (doc != null && doc.getContent() != null) {
+                    newEngine.loadFromText(doc.getContent(), "server");
+                }
+            } catch (Exception ignored) {}
+            return newEngine;
+        });
+
+        engine.applyOperation(operation);
+
+        // Broadcast character-level delta to all connected collaborators
+        messagingTemplate.convertAndSend("/topic/documents." + documentId + ".crdt", operation);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/crdt", operation);
     }
 
     @MessageMapping("/documents/{documentId}/edit")

@@ -20,7 +20,7 @@ public class DatabaseMigrationConfig {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseMigrationConfig.class);
 
     @Bean
-    public Flyway flyway(@org.springframework.beans.factory.annotation.Qualifier("primaryDataSource") DataSource dataSource, Environment env) {
+    public Flyway flyway(DataSource dataSource, Environment env) {
         boolean enabled = env.getProperty("spring.flyway.enabled", Boolean.class, true);
         if (!enabled) {
             logger.info("Flyway database migrations are disabled by configuration.");

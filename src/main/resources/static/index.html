@@ -42,6 +42,9 @@
     
     <!-- SyncPad AI Document Assistant & Gemini Copilot -->
     <script src="js/ai/ai-assistant.js"></script>
+
+    <!-- SyncPad Character-Level CRDT Collaboration Engine -->
+    <script src="js/crdt/syncpad-crdt.js"></script>
     
     <!-- Custom Design System Stylesheet -->
     <link rel="stylesheet" href="app.css">
@@ -10374,6 +10377,7 @@ async function openDocInfoModal() {
         // REAL-TIME DOCUMENT COLLABORATION ENGINE
         // ==========================================
         let docStompSubscription = null;
+        let docCrdtSubscription = null;
         let activeDocCollaborators = new Map(); // email -> { name, email, color, lastSeen }
         let collabRemoteCursors = new Map(); // email -> { el, caret, flag, color, timer }
         let docEditBroadcastTimeout = null;
@@ -10673,6 +10677,20 @@ async function openDocInfoModal() {
                             }
                         });
 
+                        // Character-level CRDT channel subscription
+                        docCrdtSubscription = stompClient.subscribe(`/topic/documents.${docId}.crdt`, (message) => {
+                            try {
+                                const op = JSON.parse(message.body);
+                                handleRemoteCrdtOperation(op);
+                            } catch (e) {
+                                console.error('Error parsing CRDT message:', e);
+                            }
+                        });
+
+                        if (window.SyncPadCrdt && currentDoc) {
+                            window.SyncPadCrdt.init(docId, currentDoc.content || '', currentUser ? currentUser.email : null);
+                        }
+
                         broadcastDocumentPresence('JOIN');
                     } catch (e) {
                         console.warn('Document subscription failed:', e);
@@ -10685,6 +10703,35 @@ async function openDocInfoModal() {
             trySubscribe();
         }
 
+        function handleRemoteCrdtOperation(op) {
+            if (!op || !currentDoc || Number(op.documentId) !== Number(currentDoc.id)) return;
+            if (currentUser && op.senderEmail === currentUser.email) return;
+
+            if (window.SyncPadCrdt) {
+                const applied = window.SyncPadCrdt.applyRemote(op);
+                if (applied) {
+                    const sheet = document.getElementById('docPageSheet');
+                    if (sheet) {
+                        const isFocused = (document.activeElement === sheet || sheet.contains(document.activeElement));
+                        const savedOffset = isFocused ? getCaretCharacterOffsetWithin(sheet) : -1;
+
+                        isReceivingRemoteEdit = true;
+                        const newText = window.SyncPadCrdt.toText();
+                        sheet.innerHTML = newText;
+                        currentDoc.content = newText;
+
+                        if (isFocused && savedOffset >= 0) {
+                            try {
+                                setCaretCharacterOffsetWithin(sheet, savedOffset);
+                            } catch (e) {}
+                        }
+                        isReceivingRemoteEdit = false;
+                    }
+                    showRemoteCollaboratorActivity(op.senderEmail ? op.senderEmail.split('@')[0] : 'Collaborator');
+                }
+            }
+        }
+
         function unsubscribeDocumentCollaboration() {
             if (docStompSubscription) {
                 try {
@@ -10692,6 +10739,12 @@ async function openDocInfoModal() {
                     docStompSubscription.unsubscribe();
                 } catch (e) {}
                 docStompSubscription = null;
+            }
+            if (docCrdtSubscription) {
+                try {
+                    docCrdtSubscription.unsubscribe();
+                } catch (e) {}
+                docCrdtSubscription = null;
             }
             activeDocCollaborators.clear();
             clearAllRemoteCursors();
