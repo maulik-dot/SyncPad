@@ -150,6 +150,30 @@ public class WebSocketSecurityIntegrationTest {
     }
 
     @Test
+    void testSubscribeToOwnUserIdNotificationsSucceeds() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(alice.getEmail(), null));
+        accessor.setDestination("/topic/users." + alice.getId() + ".notifications");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertDoesNotThrow(() -> {
+            interceptor.preSend(message, (MessageChannel) null);
+        });
+    }
+
+    @Test
+    void testSubscribeToOtherUserIdNotificationsThrowsAccessDenied() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(alice.getEmail(), null));
+        accessor.setDestination("/topic/users." + bob.getId() + ".notifications");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertThrows(AccessDeniedException.class, () -> {
+            interceptor.preSend(message, (MessageChannel) null);
+        });
+    }
+
+    @Test
     void testViewerCannotBroadcastEdits() {
         documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.VIEWER, alice.getEmail());
 

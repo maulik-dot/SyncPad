@@ -32,6 +32,12 @@ import com.example.syncpad.repository.DocumentVersionRepository;
 import com.example.syncpad.repository.FolderRepository;
 import com.example.syncpad.repository.ShareLinkRepository;
 import com.example.syncpad.repository.UserRepository;
+import com.example.syncpad.dto.request.AddTagRequest;
+import com.example.syncpad.dto.response.TagResponse;
+import com.example.syncpad.entity.Tag;
+import com.example.syncpad.entity.UserFavorite;
+import com.example.syncpad.repository.TagRepository;
+import com.example.syncpad.repository.UserFavoriteRepository;
 import com.example.syncpad.repository.WorkspacePermissionRepository;
 import com.example.syncpad.repository.WorkspaceRepository;
 
@@ -48,6 +54,13 @@ public class DocumentService {
     private final FolderService folderService;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspacePermissionRepository workspacePermissionRepository;
+    private final TagRepository tagRepository;
+    private final UserFavoriteRepository userFavoriteRepository;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
+    private final CommentService commentService;
+    private final AuditLogService auditLogService;
+    private final WebhookService webhookService;
 
     public DocumentService(
             DocumentRepository documentRepository,
@@ -59,7 +72,14 @@ public class DocumentService {
             DocumentCommentRepository commentRepository,
             FolderService folderService,
             WorkspaceRepository workspaceRepository,
-            WorkspacePermissionRepository workspacePermissionRepository
+            WorkspacePermissionRepository workspacePermissionRepository,
+            TagRepository tagRepository,
+            UserFavoriteRepository userFavoriteRepository,
+            @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate,
+            @org.springframework.context.annotation.Lazy NotificationService notificationService,
+            @org.springframework.context.annotation.Lazy CommentService commentService,
+            @org.springframework.context.annotation.Lazy AuditLogService auditLogService,
+            @org.springframework.context.annotation.Lazy WebhookService webhookService
     ) {
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
@@ -71,6 +91,13 @@ public class DocumentService {
         this.folderService = folderService;
         this.workspaceRepository = workspaceRepository;
         this.workspacePermissionRepository = workspacePermissionRepository;
+        this.tagRepository = tagRepository;
+        this.userFavoriteRepository = userFavoriteRepository;
+        this.messagingTemplate = messagingTemplate;
+        this.notificationService = notificationService;
+        this.commentService = commentService;
+        this.auditLogService = auditLogService;
+        this.webhookService = webhookService;
     }
 
     public Role getEffectiveRole(Document document, User user) {
@@ -83,7 +110,7 @@ public class DocumentService {
 
         // 2. Explicit DocumentPermission override for this user
         Optional<DocumentPermission> explicit = permissionRepository.findByUserAndDocument(user, document);
-        if (explicit.isPresent()) {
+        if (explicit.isPresent() && !explicit.get().isExpired()) {
             Role explicitRole = explicit.get().getRole();
             if (explicitRole == Role.RESTRICTED) {
                 return null; // Explicitly restricted
@@ -113,7 +140,7 @@ public class DocumentService {
                     return Role.OWNER;
                 }
                 Optional<WorkspacePermission> wsPerm = workspacePermissionRepository.findByUserAndWorkspace(user, ws);
-                if (wsPerm.isPresent()) {
+                if (wsPerm.isPresent() && !wsPerm.get().isExpired()) {
                     return wsPerm.get().getRole();
                 }
             }
@@ -207,6 +234,20 @@ public class DocumentService {
 
         saveSnapshot(savedDocument, 1, owner);
 
+        if (auditLogService != null) {
+            auditLogService.log(owner, null, savedDocument, "DOCUMENT_CREATED", "Created " + savedDocument.getFileType() + ": " + savedDocument.getTitle());
+        }
+
+        if (webhookService != null && savedDocument.getWorkspaceName() != null) {
+            workspaceRepository.findByName(savedDocument.getWorkspaceName()).ifPresent(ws ->
+                webhookService.dispatch(ws.getId(), "DOCUMENT_CREATED", java.util.Map.of(
+                        "documentId", savedDocument.getId(),
+                        "title", savedDocument.getTitle(),
+                        "owner", owner.getEmail()
+                ))
+            );
+        }
+
         return savedDocument;
     }
 
@@ -226,7 +267,7 @@ public class DocumentService {
         User user = getUserByEmail(userEmail);
         Document document = findDocumentById(id);
         Role effectiveRole = getEffectiveRole(document, user);
-        if (effectiveRole == null || effectiveRole == Role.VIEWER || effectiveRole == Role.RESTRICTED) {
+        if (effectiveRole == null || effectiveRole == Role.VIEWER || effectiveRole == Role.COMMENTER || effectiveRole == Role.RESTRICTED) {
             throw new PermissionDeniedException("You do not have permission to edit this document");
         }
     }
@@ -290,13 +331,17 @@ public class DocumentService {
             throw new PermissionDeniedException("Access restricted: You do not have access to rename this document");
         }
 
-        if (effectiveRole == Role.VIEWER) {
-            throw new PermissionDeniedException("Viewers cannot rename documents");
+        if (effectiveRole == Role.VIEWER || effectiveRole == Role.COMMENTER) {
+            throw new PermissionDeniedException("Viewers and commenters cannot rename documents");
         }
 
         document.setTitle(newTitle != null && !newTitle.isBlank() ? newTitle.trim() : "Untitled Document");
         document.setUpdatedAt(java.time.LocalDateTime.now());
-        return documentRepository.save(document);
+        Document saved = documentRepository.save(document);
+        if (auditLogService != null) {
+            auditLogService.log(user, null, saved, "DOCUMENT_RENAMED", "Renamed document to: " + saved.getTitle());
+        }
+        return saved;
     }
 
     private DocumentStatsResponse computeDocumentStats(Document document) {
@@ -414,8 +459,8 @@ public class DocumentService {
             throw new PermissionDeniedException("Access restricted: You do not have access to edit this document");
         }
 
-        if (effectiveRole == Role.VIEWER) {
-            throw new PermissionDeniedException("Viewers cannot edit document content");
+        if (effectiveRole == Role.VIEWER || effectiveRole == Role.COMMENTER) {
+            throw new PermissionDeniedException("Viewers and commenters cannot edit document content");
         }
 
         if (title != null && !title.isBlank()) {
@@ -436,11 +481,63 @@ public class DocumentService {
 
     @Transactional
     public void deleteDocument(Long id, String userEmail) {
+        trashDocument(id, userEmail);
+    }
+
+    @Transactional
+    public Document trashDocument(Long id, String userEmail) {
         User user = getUserByEmail(userEmail);
         Document document = findDocumentById(id);
 
         if (!isUserDocumentAdmin(document, user)) {
-            throw new PermissionDeniedException("Only the document owner or workspace admin can delete this document");
+            throw new PermissionDeniedException("Only the document owner or workspace admin can trash this document");
+        }
+
+        document.setTrashed(true);
+        document.setTrashedAt(java.time.LocalDateTime.now());
+        Document saved = documentRepository.save(document);
+        if (auditLogService != null) {
+            auditLogService.log(user, null, saved, "DOCUMENT_TRASHED", "Moved '" + saved.getTitle() + "' to trash");
+        }
+        return saved;
+    }
+
+    @Transactional
+    public Document restoreDocument(Long id, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(id);
+
+        if (!isUserDocumentAdmin(document, user)) {
+            throw new PermissionDeniedException("Only the document owner or workspace admin can restore this document");
+        }
+
+        document.setTrashed(false);
+        document.setTrashedAt(null);
+        Document saved = documentRepository.save(document);
+        if (auditLogService != null) {
+            auditLogService.log(user, null, saved, "DOCUMENT_RESTORED", "Restored '" + saved.getTitle() + "' from trash");
+        }
+        return saved;
+    }
+
+    public List<Document> getTrashedDocuments(String userEmail) {
+        User user = getUserByEmail(userEmail);
+        return documentRepository.findByOwnerIdAndIsTrashedTrueOrderByTrashedAtDesc(user.getId());
+    }
+
+    @Transactional
+    public void permanentlyDeleteDocument(Long id, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(id);
+
+        if (!isUserDocumentAdmin(document, user)) {
+            throw new PermissionDeniedException("Only the document owner or workspace admin can permanently delete this document");
+        }
+
+        userFavoriteRepository.deleteByDocument(document);
+        if (document.getTags() != null) {
+            document.getTags().clear();
+            documentRepository.save(document);
         }
 
         List<DocumentVersion> versions = versionRepository.findByDocumentOrderByVersionNumberDesc(document);
@@ -456,11 +553,85 @@ public class DocumentService {
     }
 
     @Transactional
-    public PermissionResponse shareDocument(Long documentId, String currentUserEmail, String targetUserEmail, Role role) {
-        if (role != Role.EDITOR && role != Role.VIEWER) {
-            throw new IllegalArgumentException("Documents can only be shared with EDITOR or VIEWER roles");
+    public int emptyTrash(String userEmail) {
+        User user = getUserByEmail(userEmail);
+        List<Document> trashed = documentRepository.findByOwnerIdAndIsTrashedTrue(user.getId());
+        for (Document doc : trashed) {
+            userFavoriteRepository.deleteByDocument(doc);
+            if (doc.getTags() != null) {
+                doc.getTags().clear();
+                documentRepository.save(doc);
+            }
+
+            versionRepository.deleteAll(versionRepository.findByDocumentOrderByVersionNumberDesc(doc));
+            permissionRepository.deleteAll(permissionRepository.findByDocument(doc));
+            shareLinkRepository.deleteByDocument(doc);
+            commentRepository.deleteByDocument(doc);
+            documentRepository.delete(doc);
         }
-        return updateDocumentPermission(documentId, null, targetUserEmail, role, currentUserEmail);
+        return trashed.size();
+    }
+
+    @Transactional
+    public int restoreBulk(List<Long> documentIds, String userEmail) {
+        int count = 0;
+        if (documentIds != null) {
+            for (Long id : documentIds) {
+                try {
+                    restoreDocument(id, userEmail);
+                    count++;
+                } catch (Exception ignored) {}
+            }
+        }
+        return count;
+    }
+
+    @Transactional
+    public int permanentDeleteBulk(List<Long> documentIds, String userEmail) {
+        int count = 0;
+        if (documentIds != null) {
+            for (Long id : documentIds) {
+                try {
+                    permanentlyDeleteDocument(id, userEmail);
+                    count++;
+                } catch (Exception ignored) {}
+            }
+        }
+        return count;
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 2 * * *")
+    @Transactional
+    public void purgeOldTrashedDocuments() {
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusDays(30);
+        List<Document> oldDocs = documentRepository.findByIsTrashedTrueAndTrashedAtBefore(cutoff);
+        for (Document doc : oldDocs) {
+            try {
+                userFavoriteRepository.deleteByDocument(doc);
+                if (doc.getTags() != null) {
+                    doc.getTags().clear();
+                    documentRepository.save(doc);
+                }
+                versionRepository.deleteAll(versionRepository.findByDocumentOrderByVersionNumberDesc(doc));
+                permissionRepository.deleteAll(permissionRepository.findByDocument(doc));
+                shareLinkRepository.deleteByDocument(doc);
+                commentRepository.deleteByDocument(doc);
+                documentRepository.delete(doc);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @Transactional
+    public PermissionResponse shareDocument(Long documentId, String currentUserEmail, String targetUserEmail, Role role) {
+        return shareDocument(documentId, currentUserEmail, targetUserEmail, role, null);
+    }
+
+    @Transactional
+    public PermissionResponse shareDocument(Long documentId, String currentUserEmail, String targetUserEmail, Role role, Integer durationHours) {
+        if (role != Role.EDITOR && role != Role.VIEWER && role != Role.COMMENTER) {
+            throw new IllegalArgumentException("Documents can only be shared with EDITOR, COMMENTER, or VIEWER roles");
+        }
+        return updateDocumentPermission(documentId, null, targetUserEmail, role, durationHours, currentUserEmail);
     }
 
     public List<PermissionResponse> getPermissions(Long documentId, String userEmail) {
@@ -481,7 +652,8 @@ public class DocumentService {
                     dp.getUser().getId(),
                     dp.getUser().getName(),
                     dp.getUser().getEmail(),
-                    dp.getRole()
+                    dp.getRole(),
+                    dp.getExpiresAt()
             ));
             processedUserIds.add(dp.getUser().getId());
         }
@@ -526,8 +698,13 @@ public class DocumentService {
 
     @Transactional
     public PermissionResponse updateDocumentPermission(Long documentId, Long targetUserId, String targetEmail, Role role, String requesterEmail) {
-        if (role != null && role != Role.EDITOR && role != Role.VIEWER && role != Role.RESTRICTED) {
-            throw new IllegalArgumentException("Document permissions can only use EDITOR, VIEWER, or RESTRICTED roles");
+        return updateDocumentPermission(documentId, targetUserId, targetEmail, role, null, requesterEmail);
+    }
+
+    @Transactional
+    public PermissionResponse updateDocumentPermission(Long documentId, Long targetUserId, String targetEmail, Role role, Integer durationHours, String requesterEmail) {
+        if (role != null && role != Role.EDITOR && role != Role.COMMENTER && role != Role.VIEWER && role != Role.RESTRICTED) {
+            throw new IllegalArgumentException("Document permissions can only use EDITOR, COMMENTER, VIEWER, or RESTRICTED roles");
         }
         User requester = getUserByEmail(requesterEmail);
         Document document = findDocumentById(documentId);
@@ -558,10 +735,15 @@ public class DocumentService {
             return new PermissionResponse(null, finalTargetUser.getId(), finalTargetUser.getName(), finalTargetUser.getEmail(), null);
         }
 
-        DocumentPermission perm = existing.orElseGet(() -> new DocumentPermission(finalTargetUser, document, role));
+        java.time.LocalDateTime expiresAt = (durationHours != null && durationHours > 0)
+                ? java.time.LocalDateTime.now().plusHours(durationHours)
+                : null;
+
+        DocumentPermission perm = existing.orElseGet(() -> new DocumentPermission(finalTargetUser, document, role, expiresAt));
         perm.setRole(role);
+        perm.setExpiresAt(expiresAt);
         DocumentPermission saved = permissionRepository.save(perm);
-        return new PermissionResponse(saved.getId(), finalTargetUser.getId(), finalTargetUser.getName(), finalTargetUser.getEmail(), saved.getRole());
+        return new PermissionResponse(saved.getId(), finalTargetUser.getId(), finalTargetUser.getName(), finalTargetUser.getEmail(), saved.getRole(), saved.getExpiresAt());
     }
 
     @Transactional
@@ -723,19 +905,7 @@ public class DocumentService {
     // ==========================================
 
     public List<com.example.syncpad.dto.response.DocumentCommentResponse> getComments(Long documentId, String userEmail) {
-        User user = getUserByEmail(userEmail);
-        Document document = findDocumentById(documentId);
-
-        if (getEffectiveRole(document, user) == null) {
-            throw new PermissionDeniedException("Access restricted: You do not have access to view this document");
-        }
-
-        List<com.example.syncpad.entity.DocumentComment> topLevelComments = 
-                commentRepository.findByDocumentAndParentIsNullOrderByCreatedAtAsc(document);
-
-        return topLevelComments.stream()
-                .map(com.example.syncpad.dto.response.DocumentCommentResponse::fromEntity)
-                .collect(Collectors.toList());
+        return commentService.getComments(documentId, userEmail);
     }
 
     @Transactional
@@ -744,81 +914,17 @@ public class DocumentService {
             String userEmail, 
             com.example.syncpad.dto.request.CreateCommentRequest request
     ) {
-        User user = getUserByEmail(userEmail);
-        Document document = findDocumentById(documentId);
-
-        if (getEffectiveRole(document, user) == null) {
-            throw new PermissionDeniedException("Access restricted: You do not have access to comment on this document");
-        }
-
-        com.example.syncpad.entity.DocumentComment parent = null;
-        if (request.getParentId() != null) {
-            parent = commentRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new IllegalArgumentException("Parent comment not found"));
-            if (parent.getDocument() == null || !parent.getDocument().getId().equals(document.getId())) {
-                throw new IllegalArgumentException("Parent comment does not belong to this document");
-            }
-        }
-
-        com.example.syncpad.entity.DocumentComment comment = new com.example.syncpad.entity.DocumentComment(
-                document,
-                user,
-                request.getText(),
-                request.getAnchorText(),
-                parent
-        );
-
-        com.example.syncpad.entity.DocumentComment saved = commentRepository.save(comment);
-        return com.example.syncpad.dto.response.DocumentCommentResponse.fromEntity(saved);
+        return commentService.createComment(documentId, userEmail, request);
     }
 
     @Transactional
     public com.example.syncpad.dto.response.DocumentCommentResponse resolveComment(Long documentId, Long commentId, String userEmail) {
-        User user = getUserByEmail(userEmail);
-        Document document = findDocumentById(documentId);
-
-        if (getEffectiveRole(document, user) == null) {
-            throw new PermissionDeniedException("Access restricted: You do not have access to modify comments on this document");
-        }
-
-        com.example.syncpad.entity.DocumentComment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
-
-        if (!comment.getDocument().getId().equals(documentId)) {
-            throw new IllegalArgumentException("Comment does not belong to the specified document");
-        }
-
-        comment.setResolved(!comment.isResolved());
-        comment.setUpdatedAt(java.time.LocalDateTime.now());
-        com.example.syncpad.entity.DocumentComment updated = commentRepository.save(comment);
-        return com.example.syncpad.dto.response.DocumentCommentResponse.fromEntity(updated);
+        return commentService.resolveComment(documentId, commentId, userEmail);
     }
 
     @Transactional
     public void deleteComment(Long documentId, Long commentId, String userEmail) {
-        User user = getUserByEmail(userEmail);
-        Document document = findDocumentById(documentId);
-
-        Role effectiveRole = getEffectiveRole(document, user);
-        if (effectiveRole == null) {
-            throw new PermissionDeniedException("Access restricted: You do not have access to this document");
-        }
-
-        com.example.syncpad.entity.DocumentComment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
-
-        if (!comment.getDocument().getId().equals(documentId)) {
-            throw new IllegalArgumentException("Comment does not belong to the specified document");
-        }
-
-        boolean isAuthor = comment.getAuthor().getId().equals(user.getId());
-        boolean isOwnerOrAdmin = effectiveRole == Role.OWNER || effectiveRole == Role.ADMIN;
-
-        if (!isAuthor && !isOwnerOrAdmin) {
-            throw new PermissionDeniedException("You do not have permission to delete this comment");
-        }
-
-        commentRepository.delete(comment);
+        commentService.deleteComment(documentId, commentId, userEmail);
     }
 
     // ==========================================
@@ -864,8 +970,154 @@ public class DocumentService {
         User user = getUserByEmail(userEmail);
         List<Document> matched = documentRepository.searchByTitleOrContent(query.trim());
         return matched.stream()
+                .filter(doc -> !doc.isTrashed())
                 .filter(doc -> getEffectiveRole(doc, user) != null)
-                .map(DocumentResponse::from)
+                .map(doc -> DocumentResponse.from(doc, isDocumentStarred(doc.getId(), user.getId())))
                 .toList();
+    }
+
+    // =========================================================================
+    // TAGS & CATEGORIZATION
+    // =========================================================================
+    @Transactional
+    public DocumentResponse addTagToDocument(Long documentId, AddTagRequest request, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(documentId);
+
+        Role effectiveRole = getEffectiveRole(document, user);
+        if (effectiveRole == null || effectiveRole == Role.VIEWER) {
+            throw new PermissionDeniedException("You do not have permission to add tags to this document");
+        }
+
+        Tag tag = null;
+        if (request.getTagId() != null) {
+            tag = tagRepository.findById(request.getTagId())
+                    .orElseThrow(() -> new IllegalArgumentException("Tag not found with ID: " + request.getTagId()));
+        } else if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            String tagName = request.getName().trim();
+            String color = request.getColor() != null && !request.getColor().trim().isEmpty() ? request.getColor().trim() : "#3b82f6";
+
+            // Resolve workspace if document belongs to one
+            String wsName = document.getWorkspaceName();
+            if (wsName == null && document.getFolder() != null) {
+                wsName = document.getFolder().getWorkspaceName();
+            }
+            Workspace workspace = wsName != null ? workspaceRepository.findByName(wsName).orElse(null) : null;
+
+            Optional<Tag> existing = workspace != null
+                    ? tagRepository.findByWorkspaceIdAndNameIgnoreCase(workspace.getId(), tagName)
+                    : tagRepository.findByWorkspaceIsNullAndNameIgnoreCase(tagName);
+
+            if (existing.isPresent()) {
+                tag = existing.get();
+                if (request.getColor() != null && !request.getColor().trim().isEmpty()) {
+                    tag.setColor(request.getColor().trim());
+                    tag = tagRepository.save(tag);
+                }
+            } else {
+                tag = tagRepository.save(new Tag(tagName, color, workspace));
+            }
+        } else {
+            throw new IllegalArgumentException("Tag ID or tag name must be provided");
+        }
+
+        document.addTag(tag);
+        Document saved = documentRepository.save(document);
+        boolean isStarred = isDocumentStarred(saved.getId(), user.getId());
+        return DocumentResponse.from(saved, isStarred);
+    }
+
+    @Transactional
+    public DocumentResponse removeTagFromDocument(Long documentId, Long tagId, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(documentId);
+
+        Role effectiveRole = getEffectiveRole(document, user);
+        if (effectiveRole == null || effectiveRole == Role.VIEWER) {
+            throw new PermissionDeniedException("You do not have permission to modify tags on this document");
+        }
+
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new IllegalArgumentException("Tag not found with ID: " + tagId));
+
+        document.removeTag(tag);
+        Document saved = documentRepository.save(document);
+        boolean isStarred = isDocumentStarred(saved.getId(), user.getId());
+        return DocumentResponse.from(saved, isStarred);
+    }
+
+    public List<TagResponse> getWorkspaceTags(Long workspaceId, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace not found with ID: " + workspaceId));
+
+        if (workspace.getOwner() != null && !workspace.getOwner().getId().equals(user.getId())) {
+            Optional<WorkspacePermission> perm = workspacePermissionRepository.findByUserAndWorkspace(user, workspace);
+            if (perm.isEmpty()) {
+                throw new PermissionDeniedException("You do not have access to this workspace");
+            }
+        }
+
+        return tagRepository.findByWorkspaceIdOrderByNameAsc(workspaceId).stream()
+                .map(TagResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<DocumentResponse> getDocumentsByTag(String tagName, String userEmail) {
+        if (tagName == null || tagName.trim().isEmpty()) {
+            return List.of();
+        }
+        User user = getUserByEmail(userEmail);
+        List<Document> matched = documentRepository.findByTagName(tagName.trim());
+        return matched.stream()
+                .filter(doc -> !doc.isTrashed())
+                .filter(doc -> getEffectiveRole(doc, user) != null)
+                .map(doc -> DocumentResponse.from(doc, isDocumentStarred(doc.getId(), user.getId())))
+                .collect(Collectors.toList());
+    }
+
+    // =========================================================================
+    // STARRED / FAVORITES
+    // =========================================================================
+    @Transactional
+    public DocumentResponse starDocument(Long documentId, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(documentId);
+
+        if (getEffectiveRole(document, user) == null) {
+            throw new PermissionDeniedException("You do not have access to this document");
+        }
+
+        if (!userFavoriteRepository.existsByUserIdAndDocumentId(user.getId(), documentId)) {
+            userFavoriteRepository.save(new UserFavorite(user, document));
+        }
+
+        return DocumentResponse.from(document, true);
+    }
+
+    @Transactional
+    public DocumentResponse unstarDocument(Long documentId, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(documentId);
+
+        userFavoriteRepository.deleteByUserIdAndDocumentId(user.getId(), documentId);
+        return DocumentResponse.from(document, false);
+    }
+
+    public List<DocumentResponse> getStarredDocuments(String userEmail) {
+        User user = getUserByEmail(userEmail);
+        List<UserFavorite> favorites = userFavoriteRepository.findByUserIdAndDocumentIsNotNullOrderByCreatedAtDesc(user.getId());
+
+        return favorites.stream()
+                .map(UserFavorite::getDocument)
+                .filter(doc -> doc != null && !doc.isTrashed())
+                .filter(doc -> getEffectiveRole(doc, user) != null)
+                .map(doc -> DocumentResponse.from(doc, true))
+                .collect(Collectors.toList());
+    }
+
+    public boolean isDocumentStarred(Long documentId, Long userId) {
+        if (documentId == null || userId == null || userFavoriteRepository == null) return false;
+        return userFavoriteRepository.existsByUserIdAndDocumentId(userId, documentId);
     }
 }

@@ -1,5 +1,8 @@
 package com.example.syncpad.entity;
 
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -32,13 +35,25 @@ public class DocumentPermission {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     public DocumentPermission() {
     }
 
     public DocumentPermission(User user, Document document, Role role) {
+        this(user, document, role, null);
+    }
+
+    public DocumentPermission(User user, Document document, Role role, LocalDateTime expiresAt) {
         this.user = user;
         this.document = document;
         this.role = role;
+        this.expiresAt = expiresAt;
+    }
+
+    public boolean isExpired() {
+        return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
     }
 
     public Long getId() {
@@ -71,5 +86,13 @@ public class DocumentPermission {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }

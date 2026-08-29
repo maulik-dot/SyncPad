@@ -49,6 +49,7 @@ public class NotificationService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getUserNotifications(String userEmail) {
         return notificationRepository.findByRecipientEmailOrderByCreatedAtDesc(userEmail)
                 .stream()
@@ -56,6 +57,7 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public long getUnreadCount(String userEmail) {
         return notificationRepository.countByRecipientEmailAndIsReadFalse(userEmail);
     }
@@ -267,5 +269,50 @@ public class NotificationService {
     @Transactional
     public void clearAllNotifications(String userEmail) {
         notificationRepository.deleteByRecipientEmail(userEmail);
+    }
+
+    public void pushNotification(User recipient, NotificationResponse response) {
+        if (recipient == null || messagingTemplate == null || response == null) return;
+        try {
+            // 1. Destination: /topic/notifications/{email}
+            messagingTemplate.convertAndSend("/topic/notifications/" + recipient.getEmail(), response);
+
+            // 2. Destination: /topic/users.{userId}.notifications and /topic/users/{userId}/notifications
+            if (recipient.getId() != null) {
+                messagingTemplate.convertAndSend("/topic/users." + recipient.getId() + ".notifications", response);
+                messagingTemplate.convertAndSend("/topic/users/" + recipient.getId() + "/notifications", response);
+            }
+
+            // 3. User queue destination
+            messagingTemplate.convertAndSendToUser(recipient.getEmail(), "/queue/notifications", response);
+        } catch (Exception ignored) {
+            // Client may not be connected via WebSocket
+        }
+    }
+
+    @Transactional
+    public NotificationResponse createCommentNotification(User recipient, User commenter, com.example.syncpad.entity.Document document, String commentText) {
+        if (recipient == null || commenter == null || document == null) return null;
+        if (recipient.getId() != null && recipient.getId().equals(commenter.getId())) return null; // Don't notify oneself
+
+        String snippet = commentText != null ? (commentText.length() > 60 ? commentText.substring(0, 57) + "..." : commentText) : "";
+        String message = commenter.getName() + " commented on '" + document.getTitle() + "': \"" + snippet + "\"";
+
+        Notification notification = new Notification(
+                recipient,
+                commenter,
+                null,
+                NotificationType.SYSTEM,
+                "New Comment",
+                message,
+                null,
+                NotificationStatus.RESOLVED
+        );
+        notification.setRead(false);
+        Notification saved = notificationRepository.save(notification);
+        NotificationResponse response = NotificationResponse.fromEntity(saved);
+
+        pushNotification(recipient, response);
+        return response;
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
+import com.example.syncpad.repository.UserRepository;
 import com.example.syncpad.security.CustomUserDetailsService;
 import com.example.syncpad.security.JwtService;
 import com.example.syncpad.security.TokenBlacklistService;
@@ -33,17 +34,20 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final CustomUserDetailsService userDetailsService;
     private final DocumentService documentService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserRepository userRepository;
 
     public WebSocketConfig(
             JwtService jwtService,
             CustomUserDetailsService userDetailsService,
-            DocumentService documentService,
-            TokenBlacklistService tokenBlacklistService
+            @org.springframework.context.annotation.Lazy DocumentService documentService,
+            TokenBlacklistService tokenBlacklistService,
+            UserRepository userRepository
     ) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.documentService = documentService;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.userRepository = userRepository;
     }
 
     @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8443,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8082,http://127.0.0.1:8443}")
@@ -149,6 +153,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         String targetUser = destination.substring("/topic/notifications/".length());
                         if (!targetUser.equalsIgnoreCase(user.getName())) {
                             throw new AccessDeniedException("Cannot subscribe to notifications for another user");
+                        }
+                    } else if (destination != null && (destination.startsWith("/topic/users.") || destination.startsWith("/topic/users/"))) {
+                        String suffix = destination.startsWith("/topic/users.")
+                                ? destination.substring("/topic/users.".length())
+                                : destination.substring("/topic/users/".length());
+                        String targetUserIdStr = suffix.split("[/.]", 2)[0];
+                        try {
+                            Long targetUserId = Long.valueOf(targetUserIdStr);
+                            com.example.syncpad.entity.User authUser = userRepository.findByEmail(user.getName())
+                                    .orElseThrow(() -> new AccessDeniedException("User not found"));
+                            if (!authUser.getId().equals(targetUserId)) {
+                                throw new AccessDeniedException("Cannot subscribe to notifications for another user ID");
+                            }
+                        } catch (AccessDeniedException ade) {
+                            throw ade;
+                        } catch (Exception e) {
+                            throw new AccessDeniedException("Invalid user notification destination: " + destination, e);
                         }
                     } else if (destination != null && (destination.startsWith("/topic/documents/") || destination.startsWith("/topic/documents."))) {
                         String suffix = destination.startsWith("/topic/documents/")

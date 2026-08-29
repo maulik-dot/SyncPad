@@ -41,6 +41,7 @@ public class WorkspaceService {
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
@@ -55,7 +56,9 @@ public class WorkspaceService {
             com.example.syncpad.repository.DocumentCommentRepository documentCommentRepository,
             NotificationRepository notificationRepository,
             SimpMessagingTemplate messagingTemplate,
-            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
+            @org.springframework.context.annotation.Lazy AuditLogService auditLogService,
+            @org.springframework.context.annotation.Lazy WebhookService webhookService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -70,7 +73,11 @@ public class WorkspaceService {
         this.notificationRepository = notificationRepository;
         this.messagingTemplate = messagingTemplate;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
+        this.webhookService = webhookService;
     }
+
+    private final WebhookService webhookService;
 
     public boolean isUserAdmin(Workspace workspace, User user) {
         if (workspace == null || user == null) return false;
@@ -78,13 +85,13 @@ public class WorkspaceService {
             return true;
         }
         return workspacePermissionRepository.findByUserAndWorkspace(user, workspace)
-                .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN)
+                .map(p -> !p.isExpired() && (p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN))
                 .orElse(false);
     }
 
     private void validateMemberRole(Role role) {
-        if (role != Role.EDITOR && role != Role.VIEWER) {
-            throw new IllegalArgumentException("Workspace members can only be assigned EDITOR or VIEWER roles");
+        if (role != Role.EDITOR && role != Role.VIEWER && role != Role.COMMENTER) {
+            throw new IllegalArgumentException("Workspace members can only be assigned EDITOR, COMMENTER, or VIEWER roles");
         }
     }
 
@@ -96,12 +103,14 @@ public class WorkspaceService {
         String initial = (name != null && name.length() > 0) ? name.substring(0, 1).toUpperCase() : "W";
         Workspace workspace = new Workspace(name, description, color, initial, owner);
         workspace.setCurrentUserRole(Role.OWNER);
-        Workspace savedWorkspace = workspaceRepository.save(workspace);
+        Workspace savedWorkspace = workspaceRepository.saveAndFlush(workspace);
 
         WorkspacePermission ownerPermission = new WorkspacePermission(savedWorkspace, owner, Role.OWNER);
-        workspacePermissionRepository.save(ownerPermission);
 
         savedWorkspace.setCurrentUserRole(Role.OWNER);
+        if (auditLogService != null) {
+            auditLogService.log(owner, savedWorkspace, null, "WORKSPACE_CREATED", "Created workspace '" + savedWorkspace.getName() + "'");
+        }
         return savedWorkspace;
     }
 
@@ -247,7 +256,11 @@ public class WorkspaceService {
                 .orElseGet(() -> new WorkspacePermission(workspace, targetUser, role));
 
         permission.setRole(role);
-        return workspacePermissionRepository.save(permission);
+        WorkspacePermission saved = workspacePermissionRepository.save(permission);
+        if (auditLogService != null) {
+            auditLogService.log(owner, workspace, null, "MEMBER_INVITED", "Invited " + targetUser.getName() + " (" + targetEmail + ") as " + role);
+        }
+        return saved;
     }
 
     public List<WorkspacePermission> getWorkspaceMembers(Long workspaceId, String userEmail) {
@@ -288,6 +301,10 @@ public class WorkspaceService {
 
         workspacePermissionRepository.findByUserAndWorkspace(member, workspace)
                 .ifPresent(workspacePermissionRepository::delete);
+
+        if (auditLogService != null) {
+            auditLogService.log(requester, workspace, null, "MEMBER_REMOVED", isSelfRemoval ? "Left the workspace" : "Removed member " + member.getName());
+        }
     }
 
     @Transactional
@@ -315,6 +332,10 @@ public class WorkspaceService {
 
         permission.setRole(newRole);
         WorkspacePermission savedPermission = workspacePermissionRepository.save(permission);
+
+        if (auditLogService != null) {
+            auditLogService.log(requester, workspace, null, "MEMBER_ROLE_UPDATED", "Updated " + member.getName() + "'s role to " + newRole);
+        }
 
         // Send notification to member
         if (!member.getId().equals(requester.getId())) {

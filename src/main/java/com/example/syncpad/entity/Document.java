@@ -1,6 +1,17 @@
 package com.example.syncpad.entity;
 import java.time.LocalDateTime;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Version;
 
 @Entity
 public class Document {
@@ -34,6 +45,9 @@ public class Document {
     @Column(name = "is_trashed", columnDefinition = "boolean default false")
     private boolean isTrashed = false;
 
+    @Column(name = "trashed_at")
+    private LocalDateTime trashedAt;
+
     @Column(name = "pdf_file_name")
     private String pdfFileName;
 
@@ -42,6 +56,14 @@ public class Document {
 
     @Column(name = "workspace_name")
     private String workspaceName;
+
+    @jakarta.persistence.ManyToMany(fetch = FetchType.LAZY)
+    @jakarta.persistence.JoinTable(
+        name = "document_tags",
+        joinColumns = @JoinColumn(name = "document_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private java.util.Set<Tag> tags = new java.util.HashSet<>();
 
     public Document(String title, String content, User owner) {
         this.title = title;
@@ -131,4 +153,23 @@ public class Document {
 
     public LocalDateTime getCreatedAt() { return createdAT; }
     public Long getVersion() { return version; }
+
+    public LocalDateTime getTrashedAt() { return trashedAt; }
+    public void setTrashedAt(LocalDateTime trashedAt) { this.trashedAt = trashedAt; }
+
+    public java.util.Set<Tag> getTags() { return tags; }
+    public void setTags(java.util.Set<Tag> tags) { this.tags = tags; }
+
+    public void addTag(Tag tag) {
+        if (this.tags == null) {
+            this.tags = new java.util.HashSet<>();
+        }
+        this.tags.add(tag);
+    }
+
+    public void removeTag(Tag tag) {
+        if (this.tags != null) {
+            this.tags.remove(tag);
+        }
+    }
 }

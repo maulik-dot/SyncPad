@@ -22,6 +22,8 @@ import com.example.syncpad.exception.PermissionDeniedException;
 import com.example.syncpad.repository.DocumentPermissionRepository;
 import com.example.syncpad.repository.DocumentRepository;
 import com.example.syncpad.repository.DocumentVersionRepository;
+import com.example.syncpad.repository.TagRepository;
+import com.example.syncpad.repository.UserFavoriteRepository;
 import com.example.syncpad.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +40,12 @@ public class DocumentServiceTest {
 
     @Mock
     private DocumentVersionRepository versionRepository;
+
+    @Mock
+    private TagRepository tagRepository;
+
+    @Mock
+    private UserFavoriteRepository userFavoriteRepository;
 
     @InjectMocks
     private DocumentService documentService;

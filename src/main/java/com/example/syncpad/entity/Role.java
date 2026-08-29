@@ -4,6 +4,7 @@ public enum Role {
     OWNER,
     ADMIN,
     EDITOR,
+    COMMENTER,
     VIEWER,
     RESTRICTED
 }

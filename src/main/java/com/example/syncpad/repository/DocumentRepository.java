@@ -1,9 +1,11 @@
 package com.example.syncpad.repository;
 
 import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import com.example.syncpad.entity.Document;
 import com.example.syncpad.entity.FileType;
 
@@ -18,5 +20,14 @@ public interface DocumentRepository extends JpaRepository<Document, Long>{
            "(LOWER(d.title) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            " LOWER(d.content) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Document> searchByTitleOrContent(@Param("query") String query);
+
+    List<Document> findByOwnerIdAndIsTrashedTrueOrderByTrashedAtDesc(Long ownerId);
+
+    List<Document> findByOwnerIdAndIsTrashedTrue(Long ownerId);
+
+    List<Document> findByIsTrashedTrueAndTrashedAtBefore(java.time.LocalDateTime cutoff);
+
+    @Query("SELECT DISTINCT d FROM Document d JOIN d.tags t WHERE LOWER(t.name) = LOWER(:tagName) AND d.isTrashed = false")
+    List<Document> findByTagName(@Param("tagName") String tagName);
 }
 

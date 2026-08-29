@@ -14,12 +14,19 @@ public class ShareDocumentRequest {
     @NotNull(message = "Role is required")
     private Role role;
 
+    private Integer durationHours;
+
     public ShareDocumentRequest() {
     }
 
     public ShareDocumentRequest(String email, Role role) {
+        this(email, role, null);
+    }
+
+    public ShareDocumentRequest(String email, Role role, Integer durationHours) {
         this.email = email;
         this.role = role;
+        this.durationHours = durationHours;
     }
 
     public String getEmail() {
@@ -36,5 +43,13 @@ public class ShareDocumentRequest {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Integer getDurationHours() {
+        return durationHours;
+    }
+
+    public void setDurationHours(Integer durationHours) {
+        this.durationHours = durationHours;
     }
 }

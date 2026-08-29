@@ -1,11 +1,22 @@
 package com.example.syncpad.entity;
 
 import java.time.LocalDateTime;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "workspace_permissions", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"workspace_id", "user_id"})
+    @UniqueConstraint(columnNames = {"user_id", "workspace_id"})
 })
 public class WorkspacePermission {
 
@@ -13,43 +24,88 @@ public class WorkspacePermission {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "workspace_id", nullable = false)
     private Workspace workspace;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Role role;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    @PrePersist
-    protected void onCreate() {
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
+    public WorkspacePermission() {
         this.createdAt = LocalDateTime.now();
     }
 
-    public WorkspacePermission() {}
-
     public WorkspacePermission(Workspace workspace, User user, Role role) {
+        this(workspace, user, role, null);
+    }
+
+    public WorkspacePermission(Workspace workspace, User user, Role role, LocalDateTime expiresAt) {
         this.workspace = workspace;
         this.user = user;
         this.role = role;
+        this.expiresAt = expiresAt;
+        this.createdAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public Workspace getWorkspace() { return workspace; }
-    public void setWorkspace(Workspace workspace) { this.workspace = workspace; }
+    public boolean isExpired() {
+        return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
+    }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+    public Long getId() {
+        return id;
+    }
 
-    public Role getRole() { return role; }
-    public void setRole(Role role) { this.role = role; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public Workspace getWorkspace() {
+        return workspace;
+    }
+
+    public void setWorkspace(Workspace workspace) {
+        this.workspace = workspace;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
+    }
 }

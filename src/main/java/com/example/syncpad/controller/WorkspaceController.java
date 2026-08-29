@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.syncpad.dto.response.DocumentResponse;
@@ -30,10 +31,19 @@ public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
     private final NotificationService notificationService;
+    private final com.example.syncpad.service.DocumentService documentService;
+    private final com.example.syncpad.service.AuditLogService auditLogService;
 
-    public WorkspaceController(WorkspaceService workspaceService, NotificationService notificationService) {
+    public WorkspaceController(
+            WorkspaceService workspaceService,
+            NotificationService notificationService,
+            com.example.syncpad.service.DocumentService documentService,
+            com.example.syncpad.service.AuditLogService auditLogService
+    ) {
         this.workspaceService = workspaceService;
         this.notificationService = notificationService;
+        this.documentService = documentService;
+        this.auditLogService = auditLogService;
     }
 
     public static class CreateWorkspaceRequest {
@@ -187,5 +197,20 @@ public class WorkspaceController {
                 .map(DocumentResponse::from)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/tags")
+    public List<com.example.syncpad.dto.response.TagResponse> getWorkspaceTags(@PathVariable Long id, Authentication authentication) {
+        return documentService.getWorkspaceTags(id, authentication.getName());
+    }
+
+    @GetMapping("/{id}/activity")
+    public org.springframework.data.domain.Page<com.example.syncpad.dto.response.AuditLogResponse> getWorkspaceActivity(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
+        return auditLogService.getWorkspaceActivity(id, authentication.getName(), page, size);
     }
 }

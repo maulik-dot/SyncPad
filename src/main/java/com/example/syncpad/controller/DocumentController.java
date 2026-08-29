@@ -1,7 +1,11 @@
 package com.example.syncpad.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.example.syncpad.dto.request.AddTagRequest;
+import com.example.syncpad.dto.response.TagResponse;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -41,9 +45,17 @@ import jakarta.validation.Valid;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final com.example.syncpad.service.AuditLogService auditLogService;
+    private final com.example.syncpad.service.DocumentExportService exportService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(
+            DocumentService documentService,
+            com.example.syncpad.service.AuditLogService auditLogService,
+            com.example.syncpad.service.DocumentExportService exportService
+    ) {
         this.documentService = documentService;
+        this.auditLogService = auditLogService;
+        this.exportService = exportService;
     }
 
     public static class RenameDocumentRequest {
@@ -86,8 +98,12 @@ public class DocumentController {
     public List<DocumentResponse> getAllDocuments(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Long folderId,
+            @RequestParam(required = false) String tag,
             Authentication authentication
     ) {
+        if (tag != null && !tag.trim().isEmpty()) {
+            return documentService.getDocumentsByTag(tag.trim(), authentication.getName());
+        }
         List<Document> docs;
         if (folderId != null) {
             docs = documentService.getDocumentsByFolder(folderId, authentication.getName());
@@ -95,6 +111,11 @@ public class DocumentController {
             docs = documentService.getAccessibleDocuments(authentication.getName(), type);
         }
         return docs.stream().map(DocumentResponse::from).collect(Collectors.toList());
+    }
+
+    @GetMapping("/starred")
+    public List<DocumentResponse> getStarredDocuments(Authentication authentication) {
+        return documentService.getStarredDocuments(authentication.getName());
     }
 
     @GetMapping("/search")
@@ -147,9 +168,88 @@ public class DocumentController {
         return DocumentResponse.from(documentService.updateDocument(id, request.getTitle(), request.getContent(), authentication.getName()));
     }
 
+    @PostMapping("/{id}/trash")
+    public DocumentResponse trashDocument(@PathVariable Long id, Authentication authentication) {
+        return DocumentResponse.from(documentService.trashDocument(id, authentication.getName()));
+    }
+
     @DeleteMapping("/{id}")
-    public void deleteDocument(@PathVariable Long id, Authentication authentication) {
-        documentService.deleteDocument(id, authentication.getName());
+    public ResponseEntity<Map<String, Object>> deleteDocument(@PathVariable Long id, Authentication authentication) {
+        documentService.trashDocument(id, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Document moved to trash", "id", id));
+    }
+
+    @GetMapping("/trash")
+    public List<DocumentResponse> getTrashedDocuments(Authentication authentication) {
+        return documentService.getTrashedDocuments(authentication.getName())
+                .stream()
+                .map(DocumentResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @PostMapping("/{id}/restore-trash")
+    public DocumentResponse restoreTrashDocument(@PathVariable Long id, Authentication authentication) {
+        return DocumentResponse.from(documentService.restoreDocument(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/restore")
+    public DocumentResponse restoreDocument(@PathVariable Long id, Authentication authentication) {
+        return DocumentResponse.from(documentService.restoreDocument(id, authentication.getName()));
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    public ResponseEntity<Map<String, Object>> permanentlyDeleteDocument(@PathVariable Long id, Authentication authentication) {
+        documentService.permanentlyDeleteDocument(id, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Document permanently deleted", "id", id));
+    }
+
+    @DeleteMapping("/trash/empty")
+    public ResponseEntity<Map<String, Object>> emptyTrash(Authentication authentication) {
+        int count = documentService.emptyTrash(authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Trash emptied successfully", "count", count));
+    }
+
+    @PostMapping("/trash/restore-bulk")
+    public ResponseEntity<Map<String, Object>> restoreBulk(@RequestBody Map<String, List<Long>> request, Authentication authentication) {
+        List<Long> ids = request.getOrDefault("documentIds", List.of());
+        int count = documentService.restoreBulk(ids, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Documents restored successfully", "count", count));
+    }
+
+    @PostMapping("/trash/delete-bulk")
+    public ResponseEntity<Map<String, Object>> permanentDeleteBulk(@RequestBody Map<String, List<Long>> request, Authentication authentication) {
+        List<Long> ids = request.getOrDefault("documentIds", List.of());
+        int count = documentService.permanentDeleteBulk(ids, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Documents permanently deleted", "count", count));
+    }
+
+    @PostMapping("/{id}/tags")
+    public DocumentResponse addTag(
+            @PathVariable Long id,
+            @RequestBody AddTagRequest request,
+            Authentication authentication
+    ) {
+        return documentService.addTagToDocument(id, request, authentication.getName());
+    }
+
+    @DeleteMapping("/{id}/tags/{tagId}")
+    public ResponseEntity<Map<String, Object>> removeTag(
+            @PathVariable Long id,
+            @PathVariable Long tagId,
+            Authentication authentication
+    ) {
+        DocumentResponse updated = documentService.removeTagFromDocument(id, tagId, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Tag removed from document", "document", updated));
+    }
+
+    @PostMapping("/{id}/star")
+    public DocumentResponse starDocument(@PathVariable Long id, Authentication authentication) {
+        return documentService.starDocument(id, authentication.getName());
+    }
+
+    @DeleteMapping("/{id}/star")
+    public DocumentResponse unstarDocument(@PathVariable Long id, Authentication authentication) {
+        return documentService.unstarDocument(id, authentication.getName());
     }
 
     @PostMapping("/{id}/share")
@@ -162,7 +262,8 @@ public class DocumentController {
                 id,
                 authentication.getName(),
                 request.getEmail(),
-                request.getRole()
+                request.getRole(),
+                request.getDurationHours()
         );
     }
 
@@ -296,5 +397,24 @@ public class DocumentController {
             Authentication authentication
     ) {
         return DocumentResponse.from(documentService.detachPdf(id, authentication.getName()));
+    }
+
+    @GetMapping("/{id}/activity")
+    public org.springframework.data.domain.Page<com.example.syncpad.dto.response.AuditLogResponse> getDocumentActivity(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
+        return auditLogService.getDocumentActivity(id, authentication.getName(), page, size);
+    }
+
+    @GetMapping("/{id}/export")
+    public org.springframework.http.ResponseEntity<byte[]> exportDocument(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "md") String format,
+            Authentication authentication
+    ) {
+        return exportService.exportDocument(id, format, authentication.getName());
     }
 }

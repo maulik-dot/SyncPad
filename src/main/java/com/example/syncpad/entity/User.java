@@ -1,9 +1,17 @@
 package com.example.syncpad.entity;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "users")
@@ -27,16 +35,24 @@ public class User {
 
     private String providerId;
 
+    @Column(name = "profile_picture_url", length = 1024)
+    private String profilePictureUrl;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
     @OneToMany(mappedBy = "owner")
     private List<Document> documents;
 
-    public User(){
+    public User() {
+        this.createdAt = LocalDateTime.now();
     }
 
     public User(String name, String email, String password) {
         this.name = name;
         this.email = email;
         this.password = password;
+        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -71,9 +87,35 @@ public class User {
         this.password = password;
     }
 
-    public String getProvider() { return provider; }
-    public void setProvider(String provider) { this.provider = provider; }
+    public String getProvider() {
+        return provider;
+    }
 
-    public String getProviderId() { return providerId; }
-    public void setProviderId(String providerId) { this.providerId = providerId; }
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+
+    public String getProviderId() {
+        return providerId;
+    }
+
+    public void setProviderId(String providerId) {
+        this.providerId = providerId;
+    }
+
+    public String getProfilePictureUrl() {
+        return profilePictureUrl;
+    }
+
+    public void setProfilePictureUrl(String profilePictureUrl) {
+        this.profilePictureUrl = profilePictureUrl;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

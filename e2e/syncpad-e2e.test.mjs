@@ -29,7 +29,11 @@ async function request(path, options = {}) {
     'X-Forwarded-For': '198.51.100.42',
     ...(options.headers || {})
   }
-  const res = await fetch(url, { ...options, headers })
+  let body = options.body
+  if (body && typeof body === 'object') {
+    body = JSON.stringify(body)
+  }
+  const res = await fetch(url, { ...options, headers, body })
   let data = null
   const text = await res.text()
   try {
@@ -203,6 +207,441 @@ async function runSuite() {
   })
   assert(searchRes2.status === 200, `User 2 search returns 200 OK`)
   assert(!searchRes2.body.some(d => d.id === docId), `Unauthorized documents are excluded from search results`)
+
+  // 8. Trash / Soft-Delete Lifecycle
+  console.log(`\n--> Scenario 8: Trash / Soft-Delete Lifecycle`)
+  const trashDocRes = await request('/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { title: 'Trash Lifecycle Document', content: '<p>Testing trash & restore lifecycle</p>' }
+  })
+  assert(trashDocRes.status === 200, `Create document for trash test succeeds (200 OK)`)
+  const trashDocId = trashDocRes.body.id
+
+  // Verify document is in active list
+  const activeList1 = await request('/documents', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(activeList1.body.some(d => d.id === trashDocId), `Document appears in active list`)
+
+  // Move document to trash via POST /documents/{id}/trash
+  const moveTrashRes = await request(`/documents/${trashDocId}/trash`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(moveTrashRes.status === 200, `Move document to trash succeeds (200 OK)`)
+  assert(moveTrashRes.body.trashed === true, `Document trashed flag is true`)
+  assert(!!moveTrashRes.body.trashedAt, `Document trashedAt timestamp is populated`)
+
+  // Verify document is removed from active list
+  const activeList2 = await request('/documents', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(!activeList2.body.some(d => d.id === trashDocId), `Document no longer appears in active list`)
+
+  // Verify document appears in GET /documents/trash
+  const trashList1 = await request('/documents/trash', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(trashList1.status === 200, `GET /documents/trash returns 200 OK`)
+  assert(trashList1.body.some(d => d.id === trashDocId), `Document appears in trash list`)
+
+  // Restore document via POST /documents/{id}/restore-trash
+  const restoreRes = await request(`/documents/${trashDocId}/restore-trash`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(restoreRes.status === 200, `Restore document succeeds (200 OK)`)
+  assert(restoreRes.body.trashed === false, `Document trashed flag is false`)
+  assert(!restoreRes.body.trashedAt, `Document trashedAt is cleared`)
+
+  // Verify restored document is back in active list and not in trash
+  const activeList3 = await request('/documents', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(activeList3.body.some(d => d.id === trashDocId), `Document is back in active list`)
+
+  const trashList2 = await request('/documents/trash', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(!trashList2.body.some(d => d.id === trashDocId), `Document no longer appears in trash list`)
+
+  // Soft-delete via DELETE /documents/{id}
+  const deleteSoftRes = await request(`/documents/${trashDocId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(deleteSoftRes.status === 200, `DELETE /documents/{id} soft-deletes into trash`)
+
+  // Permanently delete via DELETE /documents/{id}/permanent
+  const permDeleteRes = await request(`/documents/${trashDocId}/permanent`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(permDeleteRes.status === 200, `DELETE /documents/{id}/permanent succeeds`)
+
+  // Verify permanently purged
+  const trashList3 = await request('/documents/trash', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(!trashList3.body.some(d => d.id === trashDocId), `Document purged permanently from trash`)
+
+  // Empty trash test
+  const tempDocRes = await request('/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { title: 'To Be Emptied', content: '<p>Temporary doc</p>' }
+  })
+  await request(`/documents/${tempDocRes.body.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  const emptyRes = await request('/documents/trash/empty', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(emptyRes.status === 200, `DELETE /documents/trash/empty succeeds (200 OK)`)
+  assert(emptyRes.body.count >= 1, `Purged count reported accurately`)
+
+  const trashListFinal = await request('/documents/trash', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(trashListFinal.body.length === 0, `Trash is completely empty`)
+
+  // Bulk restore and bulk permanent delete test
+  const bulkDoc1 = await request('/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { title: 'Bulk Doc 1', content: '<p>Bulk 1</p>' }
+  })
+  const bulkDoc2 = await request('/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { title: 'Bulk Doc 2', content: '<p>Bulk 2</p>' }
+  })
+
+  // Soft delete both
+  await request(`/documents/${bulkDoc1.body.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${activeUser1Token}` } })
+  await request(`/documents/${bulkDoc2.body.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${activeUser1Token}` } })
+
+  // Bulk restore
+  const bulkRestoreRes = await request('/documents/trash/restore-bulk', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { documentIds: [bulkDoc1.body.id, bulkDoc2.body.id] }
+  })
+  assert(bulkRestoreRes.status === 200, `POST /documents/trash/restore-bulk returns 200 OK`)
+  assert(bulkRestoreRes.body.count === 2, `Bulk restored count is 2`)
+
+  // Soft delete both again
+  await request(`/documents/${bulkDoc1.body.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${activeUser1Token}` } })
+  await request(`/documents/${bulkDoc2.body.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${activeUser1Token}` } })
+
+  // Bulk permanent delete
+  const bulkDeleteRes = await request('/documents/trash/delete-bulk', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { documentIds: [bulkDoc1.body.id, bulkDoc2.body.id] }
+  })
+  assert(bulkDeleteRes.status === 200, `POST /documents/trash/delete-bulk returns 200 OK`)
+  assert(bulkDeleteRes.body.count === 2, `Bulk permanent deleted count is 2`)
+
+  const afterBulkTrash = await request('/documents/trash', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(afterBulkTrash.body.length === 0, `Trash is verified empty after bulk operations`)
+
+  // -------------------------------------------------------------
+  // Scenario 9: Document Tags & Categorization
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 9: Document Tags & Categorization`)
+  
+  // 1. Create a workspace for tagging
+  const tagWsRes = await request('/workspaces', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { name: `TagWs_${Date.now()}`, description: 'Workspace for tag tests' }
+  })
+  assert(tagWsRes.status === 200, `POST /workspaces for tags returns 200 OK`)
+  const tagWsId = tagWsRes.body.id
+
+  // 2. Create a document in this workspace
+  const tagDocRes = await request('/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { title: 'Tagged Architecture Document', content: 'Architecture content', fileType: 'DOC', workspaceName: tagWsRes.body.name }
+  })
+  assert(tagDocRes.status === 200, `POST /documents returns 200 OK`)
+  const tagDocId = tagDocRes.body.id
+
+  // 3. POST /documents/{id}/tags to add a new tag "planning" with color "#10b981"
+  const addTagRes = await request(`/documents/${tagDocId}/tags`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: { name: 'planning', color: '#10b981' }
+  })
+  assert(addTagRes.status === 200, `POST /documents/{id}/tags returns 200 OK`)
+  assert(addTagRes.body.tags && addTagRes.body.tags.some(t => t.name === 'planning'), `Document has tag 'planning'`)
+  const createdTagId = addTagRes.body.tags.find(t => t.name === 'planning').id
+
+  // 4. GET /workspaces/{id}/tags to retrieve workspace tags
+  const wsTagsRes = await request(`/workspaces/${tagWsId}/tags`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(wsTagsRes.status === 200, `GET /workspaces/{id}/tags returns 200 OK`)
+  assert(wsTagsRes.body.some(t => t.name === 'planning'), `Workspace tags include 'planning'`)
+
+  // 5. GET /documents?tag=planning
+  const filterTagRes = await request('/documents?tag=planning', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(filterTagRes.status === 200, `GET /documents?tag=planning returns 200 OK`)
+  assert(filterTagRes.body.some(d => d.id === tagDocId), `Filtered documents contain tagged doc`)
+
+  // 6. DELETE /documents/{id}/tags/{tagId} to remove the tag
+  const deleteTagRes = await request(`/documents/${tagDocId}/tags/${createdTagId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(deleteTagRes.status === 200, `DELETE /documents/{id}/tags/{tagId} returns 200 OK`)
+
+  // Verify tag was removed
+  const verifyDocRes = await request(`/documents/${tagDocId}`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(!verifyDocRes.body.tags || !verifyDocRes.body.tags.some(t => t.id === createdTagId), `Tag successfully removed from document`)
+
+  // -------------------------------------------------------------
+  // Scenario 10: Starred / Favorited Documents & Whiteboards
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 10: Starred / Favorited Documents`)
+
+  // 1. Initial starred list should not contain tagDocId
+  const initialStarredRes = await request('/documents/starred', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(initialStarredRes.status === 200, `GET /documents/starred returns 200 OK`)
+  assert(!initialStarredRes.body.some(d => d.id === tagDocId), `Document is not initially starred`)
+
+  // 2. POST /documents/{id}/star
+  const starRes = await request(`/documents/${tagDocId}/star`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(starRes.status === 200, `POST /documents/{id}/star returns 200 OK`)
+  assert(starRes.body.isStarred === true || starRes.body.starred === true, `Document response reflects isStarred = true`)
+
+  // 3. GET /documents/starred should now contain the document
+  const starredListRes = await request('/documents/starred', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(starredListRes.status === 200, `GET /documents/starred returns 200 OK`)
+  assert(starredListRes.body.some(d => d.id === tagDocId), `GET /documents/starred includes newly starred document`)
+
+  // 4. DELETE /documents/{id}/star
+  const unstarRes = await request(`/documents/${tagDocId}/star`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(unstarRes.status === 200, `DELETE /documents/{id}/star returns 200 OK`)
+  assert(unstarRes.body.isStarred === false || unstarRes.body.starred === false, `Document response reflects isStarred = false`)
+
+  // 5. GET /documents/starred should no longer contain the document
+  const finalStarredRes = await request('/documents/starred', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(!finalStarredRes.body.some(d => d.id === tagDocId), `Document is removed from GET /documents/starred`)
+
+  // -------------------------------------------------------------
+  // Scenario 11: Audit Trail & Workspace Activity Feed
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 11: Audit Trail & Activity Feed`)
+  const wsActivityRes = await request(`/workspaces/${tagWsId}/activity`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(wsActivityRes.status === 200, `GET /workspaces/{id}/activity returns 200 OK`)
+  assert(Array.isArray(wsActivityRes.body.content), `Workspace activity contains paginated log entries`)
+
+  const docActivityRes = await request(`/documents/${tagDocId}/activity`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(docActivityRes.status === 200, `GET /documents/{id}/activity returns 200 OK`)
+  assert(Array.isArray(docActivityRes.body.content), `Document activity contains paginated log entries`)
+
+  // -------------------------------------------------------------
+  // Scenario 12: Templates & Blueprint Gallery
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 12: Document Templates & Blueprint Gallery`)
+  const templatesRes = await request('/templates', {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(templatesRes.status === 200, `GET /templates returns 200 OK`)
+  assert(templatesRes.body.length >= 5, `Built-in blueprints loaded (at least 5 seeded templates)`)
+  const meetingNotesTemplate = templatesRes.body.find(t => t.title.includes('Meeting Notes'))
+  assert(!!meetingNotesTemplate, `Blueprint 'Meeting Notes' exists`)
+
+  // Instantiate template into document
+  const instantiateRes = await request(`/templates/${meetingNotesTemplate.id}/instantiate?workspaceId=${tagWsId}&title=Q4%20Planning%20Notes`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(instantiateRes.status === 200, `POST /templates/{id}/instantiate returns 200 OK`)
+  assert(instantiateRes.body.title === 'Q4 Planning Notes', `Instantiated document has specified title`)
+  assert(instantiateRes.body.content.includes('Agenda'), `Instantiated document contains template body`)
+  const templateDocId = instantiateRes.body.id
+
+  // Create custom template
+  const customTemplateRes = await request('/templates', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: {
+      title: 'Incident Post-Mortem',
+      description: 'Standard root-cause analysis blueprint',
+      content: '# Post-Mortem\n\n## Timeline\n\n## Root Cause\n\n## Action Items',
+      category: 'Engineering',
+      icon: 'alert-triangle',
+      workspaceId: tagWsId
+    }
+  })
+  assert(customTemplateRes.status === 200, `POST /templates creates custom template`)
+  assert(customTemplateRes.body.title === 'Incident Post-Mortem', `Custom template saved with title`)
+
+  // -------------------------------------------------------------
+  // Scenario 13: Server-Side Document Export Engine
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 13: Server-Side Document Export Engine`)
+  
+  // Export Markdown
+  const exportMdRes = await request(`/documents/${templateDocId}/export?format=md`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(exportMdRes.status === 200, `GET /documents/{id}/export?format=md returns 200 OK`)
+  assert(exportMdRes.headers.get('content-disposition')?.includes('.md'), `Markdown export has .md Content-Disposition`)
+
+  // Export HTML
+  const exportHtmlRes = await request(`/documents/${templateDocId}/export?format=html`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(exportHtmlRes.status === 200, `GET /documents/{id}/export?format=html returns 200 OK`)
+  assert(typeof exportHtmlRes.body === 'string' && exportHtmlRes.body.includes('<!DOCTYPE html>'), `HTML export contains HTML document`)
+
+  // Export TXT
+  const exportTxtRes = await request(`/documents/${templateDocId}/export?format=txt`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(exportTxtRes.status === 200, `GET /documents/{id}/export?format=txt returns 200 OK`)
+
+  // Export JSON bundle
+  const exportJsonRes = await request(`/documents/${templateDocId}/export?format=json`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(exportJsonRes.status === 200, `GET /documents/{id}/export?format=json returns 200 OK`)
+  assert(exportJsonRes.body.title === 'Q4 Planning Notes', `JSON export includes document title and metadata`)
+
+  // Export ZIP archive bundle
+  const exportZipRes = await request(`/documents/${templateDocId}/export?format=zip`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(exportZipRes.status === 200, `GET /documents/{id}/export?format=zip returns 200 OK`)
+  assert(exportZipRes.headers.get('content-disposition')?.includes('.zip'), `ZIP export has .zip Content-Disposition`)
+
+  // -------------------------------------------------------------
+  // Scenario 14: Webhooks & Outbound Integrations
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 14: Webhooks & Outbound Integrations`)
+  const createWebhookRes = await request(`/workspaces/${tagWsId}/webhooks`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: {
+      name: 'Slack DevOps Alerts',
+      url: 'https://httpbin.org/post',
+      secret: 'syncpad_test_hmac_secret',
+      events: 'DOCUMENT_CREATED,COMMENT_ADDED'
+    }
+  })
+  if (createWebhookRes.status !== 200) {
+    console.error('DEBUG createWebhookRes failed:', createWebhookRes.status, createWebhookRes.body)
+  }
+  assert(createWebhookRes.status === 200, `POST /workspaces/{id}/webhooks returns 200 OK`)
+  assert(createWebhookRes.body.name === 'Slack DevOps Alerts', `Webhook created with name`)
+  const webhookId = createWebhookRes.body.id
+
+  // List webhooks
+  const listWebhooksRes = await request(`/workspaces/${tagWsId}/webhooks`, {
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(listWebhooksRes.status === 200, `GET /workspaces/{id}/webhooks returns 200 OK`)
+  assert(listWebhooksRes.body.some(h => h.id === webhookId), `Registered webhook appears in workspace list`)
+
+  // Test webhook ping
+  const testHookRes = await request(`/workspaces/${tagWsId}/webhooks/${webhookId}/test`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(testHookRes.status === 200, `POST /workspaces/{id}/webhooks/{id}/test returns 200 OK`)
+
+  // Delete webhook
+  const delHookRes = await request(`/workspaces/${tagWsId}/webhooks/${webhookId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${activeUser1Token}` }
+  })
+  assert(delHookRes.status === 200, `DELETE /workspaces/{id}/webhooks/{id} returns 200 OK`)
+
+  // -------------------------------------------------------------
+  // Scenario 15: Granular Collaboration RBAC (COMMENTER Role)
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 15: Granular Collaboration RBAC (COMMENTER Role)`)
+
+  // User 1 shares document with User 2 with COMMENTER role and 24h duration
+  const shareCommenterRes = await request(`/documents/${templateDocId}/share`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${activeUser1Token}` },
+    body: {
+      email: user2Email,
+      role: 'COMMENTER',
+      durationHours: 24
+    }
+  })
+  assert(shareCommenterRes.status === 200, `POST /documents/{id}/share returns 200 OK with COMMENTER role`)
+  assert(shareCommenterRes.body.role === 'COMMENTER', `Permission response reflects COMMENTER role`)
+  assert(!!shareCommenterRes.body.expiresAt, `Expiring guest access has expiresAt timestamp`)
+  assert(shareCommenterRes.body.isExpired === false, `Guest access is not expired`)
+  if (shareCommenterRes.body.isExpired !== false && shareCommenterRes.body.expired !== false) {
+    console.error('DEBUG shareCommenterRes.body:', shareCommenterRes.body)
+  }
+  assert(shareCommenterRes.body.isExpired === false || shareCommenterRes.body.expired === false, `Guest access is not expired`)
+
+  // User 2 can read comments and post a comment
+  const postCommentRes = await request(`/documents/${templateDocId}/comments`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${user2Token}` },
+    body: {
+      text: 'I suggest revising item 2 in the agenda.'
+    }
+  })
+  assert(postCommentRes.status === 200, `Commenter can post comments to document`)
+  assert(postCommentRes.body.text.includes('revising item 2'), `Comment body saved correctly`)
+
+  // User 2 cannot edit content (assertCanEditDocument blocks COMMENTER)
+  const editAttemptRes = await request(`/documents/${templateDocId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${user2Token}` },
+    body: {
+      title: 'Tampered Title',
+      content: 'Tampered Content'
+    }
+  })
+  assert(editAttemptRes.status === 403, `Commenter is FORBIDDEN (403) from updating document content`)
+
+  // User 2 cannot rename document
+  const renameAttemptRes = await request(`/documents/${templateDocId}/rename`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${user2Token}` },
+    body: {
+      title: 'Commenter Rename'
+    }
+  })
+  assert(renameAttemptRes.status === 403, `Commenter is FORBIDDEN (403) from renaming document`)
 
   console.log(`\n============================================================`)
   console.log(` E2E Verification Complete: ${testsPassed}/${testsRun} Assertions Passed!`)

@@ -2,6 +2,8 @@ package com.example.syncpad.dto.response;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import com.example.syncpad.entity.Document;
 import com.example.syncpad.entity.FileType;
 
@@ -16,15 +18,24 @@ public class DocumentResponse {
     private String ownerName;
     private Long version;
     private boolean isTrashed;
+    private LocalDateTime trashedAt;
     private String pdfFileName;
     private String pdfUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private java.util.List<TagResponse> tags = new java.util.ArrayList<>();
+
+    @JsonProperty("isStarred")
+    private boolean isStarred;
 
     public DocumentResponse() {
     }
 
     public static DocumentResponse from(Document doc) {
+        return from(doc, false);
+    }
+
+    public static DocumentResponse from(Document doc, boolean isStarred) {
         if (doc == null) return null;
         DocumentResponse resp = new DocumentResponse();
         resp.setId(doc.getId());
@@ -37,10 +48,15 @@ public class DocumentResponse {
         resp.setOwnerName(doc.getOwner() != null ? doc.getOwner().getName() : null);
         resp.setVersion(doc.getVersion());
         resp.setTrashed(doc.isTrashed());
+        resp.setTrashedAt(doc.getTrashedAt());
         resp.setPdfFileName(doc.getPdfFileName());
         resp.setPdfUrl(doc.getPdfUrl());
         resp.setCreatedAt(doc.getCreatedAt());
         resp.setUpdatedAt(doc.getUpdatedAt());
+        if (doc.getTags() != null) {
+            resp.setTags(doc.getTags().stream().map(TagResponse::from).collect(java.util.stream.Collectors.toList()));
+        }
+        resp.setStarred(isStarred);
         return resp;
     }
 
@@ -85,4 +101,16 @@ public class DocumentResponse {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public LocalDateTime getTrashedAt() { return trashedAt; }
+    public void setTrashedAt(LocalDateTime trashedAt) { this.trashedAt = trashedAt; }
+
+    public java.util.List<TagResponse> getTags() { return tags; }
+    public void setTags(java.util.List<TagResponse> tags) { this.tags = tags; }
+
+    @JsonProperty("isStarred")
+    public boolean isStarred() { return isStarred; }
+
+    @JsonProperty("isStarred")
+    public void setStarred(boolean starred) { isStarred = starred; }
 }
