@@ -606,10 +606,6 @@ async function runSuite() {
   assert(shareCommenterRes.body.role === 'COMMENTER', `Permission response reflects COMMENTER role`)
   assert(!!shareCommenterRes.body.expiresAt, `Expiring guest access has expiresAt timestamp`)
   assert(shareCommenterRes.body.isExpired === false, `Guest access is not expired`)
-  if (shareCommenterRes.body.isExpired !== false && shareCommenterRes.body.expired !== false) {
-    console.error('DEBUG shareCommenterRes.body:', shareCommenterRes.body)
-  }
-  assert(shareCommenterRes.body.isExpired === false || shareCommenterRes.body.expired === false, `Guest access is not expired`)
 
   // User 2 can read comments and post a comment
   const postCommentRes = await request(`/documents/${templateDocId}/comments`, {
