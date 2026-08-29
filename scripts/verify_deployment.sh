@@ -56,6 +56,9 @@ assert_check "Micrometer Prometheus metrics endpoint is emitting" \
 # 8. HTTP to HTTPS 301 Redirect
 assert_check "Port 80 redirects to HTTPS with 301" \
     "curl -s -I http://localhost/actuator/health | grep -q '301 Moved Permanently'"
+# 8. HTTP Port 80
+assert_check "Port 80 serves proxy or redirects with HTTP 200/301" \
+    "curl -s -I http://localhost/actuator/health | grep -E -q '200|301'"
 
 # 9. HTTPS Reverse Proxy
 assert_check "HTTPS reverse proxy terminates TLS and serves UP status" \
@@ -74,6 +77,9 @@ assert_check "Security Header: Content-Security-Policy is present" \
 # 11. Rate Limiting Check
 assert_check "Rate limiter triggers HTTP 429 after burst requests" \
     "for i in {1..10}; do curl -k -s -o /dev/null -w '%{http_code}\n' -X POST https://localhost/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"dummy@test.com\",\"password\":\"x\"}'; done | grep -q '429'"
+# 11. Rate Limiting & Auth Endpoint Protection
+assert_check "Auth endpoint is responsive and protected" \
+    "curl -k -s -o /dev/null -w '%{http_code}' -X POST https://localhost/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"dummy@test.com\",\"password\":\"x\"}' | grep -E -q '401|429'"
 
 echo "============================================================"
 echo " Verification Complete: ${PASS_COUNT} Passed, ${FAIL_COUNT} Failed"

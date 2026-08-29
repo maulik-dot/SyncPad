@@ -176,7 +176,7 @@
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                buffer = lines.pop(); // keep last incomplete line
+                buffer = lines.pop();
 
                 for (const line of lines) {
                     const trimmed = line.trim();
@@ -193,7 +193,6 @@
                                 renderStreamingMarkdown(resultContent, accumulatedText);
                             }
                         } catch (err) {
-                            // Non-JSON token string fallback
                             if (dataContent && dataContent !== '[DONE]') {
                                 accumulatedText += dataContent;
                                 lastGeneratedMarkdown = accumulatedText;
@@ -204,14 +203,12 @@
                 }
             }
 
-            // Completed successfully
             if (resultStatus) {
                 resultStatus.innerHTML = '<i data-lucide="check" style="width:13px;height:13px;color:#10b981;display:inline-block;vertical-align:middle;margin-right:4px;"></i> Generation Complete';
                 if (window.lucide) lucide.createIcons();
             }
             if (actionButtons) {
                 actionButtons.classList.remove('hidden');
-                // Adjust "Replace" button visibility
                 const replaceBtn = document.getElementById('aiReplaceSelectionBtn');
                 if (replaceBtn) {
                     replaceBtn.style.display = currentSelectionRange ? 'inline-flex' : 'none';
@@ -231,7 +228,6 @@
     }
 
     function renderStreamingMarkdown(container, markdown) {
-        // Quick high-fidelity markdown converter
         let html = markdown
             .replace(/^### (.*$)/gim, '<h3>$1</h3>')
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -317,7 +313,6 @@
         }
     }
 
-    // AI Copilot Sidebar Drawer
     window.toggleAiCopilotDrawer = function () {
         const drawer = document.getElementById('aiCopilotDrawer');
         if (!drawer) return;
@@ -337,14 +332,12 @@
         if (!text) return;
         input.value = '';
 
-        // Render user message bubble
         const userMsg = document.createElement('div');
         userMsg.className = 'copilot-msg copilot-msg-user';
         userMsg.textContent = text;
         messageList.appendChild(userMsg);
         messageList.scrollTop = messageList.scrollHeight;
 
-        // Render loading AI bubble
         const aiMsg = document.createElement('div');
         aiMsg.className = 'copilot-msg copilot-msg-ai';
         aiMsg.innerHTML = '<span class="ai-cursor-blink">Thinking...</span>';
