@@ -54,6 +54,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/auth/**",
+                    "/scim/v2/**",
                     "/ws/**",
                     "/",
                     "/index.html",

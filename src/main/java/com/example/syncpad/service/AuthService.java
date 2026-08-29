@@ -52,7 +52,7 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    private void ensureDefaultWorkspace(User user) {
+    public void ensureDefaultWorkspace(User user) {
         if (workspaceRepository.findByOwnerId(user.getId()).isEmpty()) {
             String baseName = (user.getName() != null && !user.getName().isBlank() ? user.getName() : "Personal") + "'s Workspace";
             String defaultWsName = baseName;

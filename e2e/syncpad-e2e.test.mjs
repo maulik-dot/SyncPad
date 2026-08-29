@@ -722,6 +722,97 @@ async function runSuite() {
   assert(offlineJsRes.status === 200, `GET /js/offline/syncpad-offline.js returns 200 OK`)
   assert(typeof offlineJsRes.body === 'string' && offlineJsRes.body.includes('SyncPadOfflineDB'), `IndexedDB offline storage manager loaded`)
 
+  // -------------------------------------------------------------
+  // Scenario 18: Enterprise SSO & SCIM 2.0 Directory Lifecycle
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 18: Enterprise SSO (SAML 2.0 / OIDC) & SCIM 2.0 Provisioning`)
+
+  // 1. GET /auth/sso/providers returns configured enterprise IdPs
+  const ssoProvidersRes = await request('/auth/sso/providers')
+  assert(ssoProvidersRes.status === 200, `GET /auth/sso/providers returns 200 OK`)
+  assert(Array.isArray(ssoProvidersRes.body) && ssoProvidersRes.body.length >= 3, `Discovered enterprise identity providers (Okta, Azure, Google)`)
+
+  // 2. POST /auth/sso/discover resolves corporate email to provider metadata
+  const ssoDiscoverRes = await request('/auth/sso/discover', {
+    method: 'POST',
+    body: { email: 'staff@okta.com' }
+  })
+  assert(ssoDiscoverRes.status === 200, `POST /auth/sso/discover returns 200 OK`)
+  assert(ssoDiscoverRes.body.provider === 'OKTA', `Domain correctly mapped to OKTA identity provider`)
+
+  // 3. POST /auth/sso/login executes Just-In-Time (JIT) provisioning
+  const ssoUserEmail = `sso_employee_${ts}@okta.com`
+  const ssoLoginRes = await request('/auth/sso/login', {
+    method: 'POST',
+    body: {
+      provider: 'OKTA',
+      email: ssoUserEmail,
+      name: 'SSO Employee',
+      department: 'Infrastructure & Security',
+      assertion: 'valid-okta-saml-response'
+    }
+  })
+  assert(ssoLoginRes.status === 200, `POST /auth/sso/login with JIT provisioning returns 200 OK`)
+  const ssoToken = ssoLoginRes.body.accessToken || ssoLoginRes.body.token
+  assert(ssoToken !== undefined, `SSO login issues JWT access token`)
+  assert(ssoLoginRes.body.refreshToken !== undefined, `SSO login issues refresh token`)
+
+  // Verify auto-provisioned workspace exists for JIT provisioned user
+  const ssoWsRes = await request('/workspaces', {
+    headers: { Authorization: `Bearer ${ssoToken}` }
+  })
+  assert(ssoWsRes.status === 200, `GET /workspaces for JIT user returns 200 OK`)
+  assert(Array.isArray(ssoWsRes.body) && ssoWsRes.body.length > 0, `Auto-provisioned default personal workspace for SSO user`)
+
+  // 4. GET /scim/v2/ServiceProviderConfig returns RFC 7643 compliance
+  const scimConfigRes = await request('/scim/v2/ServiceProviderConfig')
+  assert(scimConfigRes.status === 200, `GET /scim/v2/ServiceProviderConfig returns 200 OK`)
+  assert(scimConfigRes.body.patch && scimConfigRes.body.patch.supported === true, `SCIM 2.0 declares PATCH operation support`)
+
+  // 5. POST /scim/v2/Users provisions employee via enterprise directory sync
+  const scimEmployeeEmail = `scim_staff_${ts}@syncpad.test`
+  const scimCreateRes = await request('/scim/v2/Users', {
+    method: 'POST',
+    body: {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: scimEmployeeEmail,
+      displayName: 'Directory Employee',
+      department: 'Product Engineering',
+      active: true,
+      emails: [{ value: scimEmployeeEmail, primary: true }]
+    }
+  })
+  assert(scimCreateRes.status === 201, `POST /scim/v2/Users provisions user (201 Created)`)
+  assert(scimCreateRes.body.id !== undefined, `SCIM provisioned user returns unique ID`)
+  const scimUserId = scimCreateRes.body.id
+
+  // 6. GET /scim/v2/Users/{id} retrieves user representation
+  const scimGetRes = await request(`/scim/v2/Users/${scimUserId}`)
+  assert(scimGetRes.status === 200, `GET /scim/v2/Users/{id} returns 200 OK`)
+  assert(scimGetRes.body.active === true, `SCIM user active status is true`)
+
+  // 7. PATCH /scim/v2/Users/{id} deactivates user (employee offboarding)
+  const scimDeactivateRes = await request(`/scim/v2/Users/${scimUserId}`, {
+    method: 'PATCH',
+    body: {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'active', value: false }]
+    }
+  })
+  assert(scimDeactivateRes.status === 200, `PATCH /scim/v2/Users/{id} deactivates user (200 OK)`)
+  assert(scimDeactivateRes.body.active === false, `Patched user active status is false`)
+
+  // 8. Deactivated corporate user is FORBIDDEN (403) from SSO login
+  const deactLoginRes = await request('/auth/sso/login', {
+    method: 'POST',
+    body: {
+      provider: 'OKTA',
+      email: scimEmployeeEmail,
+      name: 'Directory Employee'
+    }
+  })
+  assert(deactLoginRes.status === 403, `Deactivated corporate account rejected from SSO login (403 Forbidden)`)
+
   console.log(`\n============================================================`)
   console.log(` E2E Verification Complete: ${testsPassed}/${testsRun} Assertions Passed!`)
   console.log(`============================================================\n`)

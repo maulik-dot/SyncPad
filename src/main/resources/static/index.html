@@ -145,6 +145,12 @@
                     <span>Continue with Google</span>
                 </button>
 
+                <!-- ENTERPRISE SSO BUTTON -->
+                <button onclick="openSsoModal()" class="btn btn-outline" style="width: 100%; justify-content: center; gap: 0.65rem; padding: 0.6rem; margin-top: 0.5rem; background: var(--bg-surface);">
+                    <i data-lucide="building-2" style="width:16px;height:16px;color:#4f46e5;"></i>
+                    <span>Single Sign-On (SSO / Okta / Azure)</span>
+                </button>
+
                 <p style="text-align: center; font-size: 0.8rem; margin-top: 1.5rem; color: var(--text-secondary);">
                     Don't have an account? 
                     <a href="#" onclick="toggleAuthMode('register')" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Create account</a>
@@ -183,6 +189,31 @@
                     Already have an account? 
                     <a href="#" onclick="toggleAuthMode('login')" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Sign in</a>
                 </p>
+            </div>
+
+            <!-- SSO DOMAIN DISCOVERY MODAL -->
+            <div id="ssoModal" class="modal-backdrop hidden" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center;">
+                <div class="card" style="width: 100%; max-width: 420px; padding: 2rem; box-shadow: var(--shadow-xl); background: var(--bg-surface); border-radius: var(--radius-lg);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="shield-check" style="width: 20px; height: 20px; color: #4f46e5;"></i>
+                            Corporate Single Sign-On
+                        </h3>
+                        <button type="button" class="btn btn-icon btn-sm" onclick="closeSsoModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+                    </div>
+                    <p style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.25rem;">
+                        Enter your enterprise work email. SyncPad will automatically discover your organization's Identity Provider (Okta, Microsoft Entra ID, SAML 2.0).
+                    </p>
+                    <form onsubmit="handleSsoDiscover(event)">
+                        <div class="input-group" style="margin-bottom: 1.25rem;">
+                            <label class="input-label">Work Email</label>
+                            <input type="email" id="ssoWorkEmail" class="input" placeholder="name@company.com" required value="alex@okta.com">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                            Continue with Identity Provider
+                        </button>
+                    </form>
+                </div>
             </div>
 
         </div>
@@ -2838,6 +2869,74 @@
                 }
             } catch (err) {
                 toast('Registration failed. Please check connection.');
+            }
+        }
+
+        function openSsoModal() {
+            const modal = document.getElementById('ssoModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+
+        function closeSsoModal() {
+            const modal = document.getElementById('ssoModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+        }
+
+        async function handleSsoDiscover(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('ssoWorkEmail');
+            const email = emailInput ? emailInput.value.trim() : '';
+            if (!email) return;
+
+            try {
+                const res = await fetch('/auth/sso/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                if (res.ok) {
+                    const provider = await res.json();
+                    toast(`Authenticating with ${provider.displayName || 'SSO Provider'}...`);
+
+                    // Execute SSO Login with JIT provisioning
+                    const loginRes = await fetch('/auth/sso/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            provider: provider.provider,
+                            email: email,
+                            name: email.split('@')[0],
+                            assertion: 'corporate-saml-sso-token'
+                        })
+                    });
+
+                    if (loginRes.ok) {
+                        const data = await loginRes.json();
+                        token = data.accessToken || data.token;
+                        localStorage.setItem('syncpad_token', token);
+                        currentUser = { id: data.id, name: data.name || email.split('@')[0], email: data.email || email };
+                        localStorage.setItem('syncpad_user', JSON.stringify(currentUser));
+                        closeSsoModal();
+                        showMainShell();
+                        loadUserWorkspaces();
+                        toast(`Signed in via Enterprise SSO (${provider.displayName})!`);
+                    } else {
+                        const err = await loginRes.json().catch(() => ({}));
+                        toast(err.message || 'SSO authentication rejected');
+                    }
+                } else {
+                    toast('SSO identity provider not found for this domain');
+                }
+            } catch (err) {
+                toast('Error connecting to enterprise SSO service');
             }
         }
 

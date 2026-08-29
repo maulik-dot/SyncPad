@@ -41,6 +41,14 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    @Column(name = "sso_domain")
+    private String ssoDomain;
+
+    private String department;
+
     @OneToMany(mappedBy = "owner")
     private List<Document> documents;
 
@@ -117,5 +125,29 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getActive() {
+        return active != null ? active : true;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    public String getSsoDomain() {
+        return ssoDomain;
+    }
+
+    public void setSsoDomain(String ssoDomain) {
+        this.ssoDomain = ssoDomain;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 }
