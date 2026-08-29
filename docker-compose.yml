@@ -60,10 +60,10 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-syncpad_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-syncpad_user}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-syncpad_prod_password_2026_x7k9m}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
       SPRING_FLYWAY_ENABLED: ${SPRING_FLYWAY_ENABLED:-true}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_SECRET: ${JWT_SECRET:-0c28b4fa729f17160fe166b43ac5ac4254a9cb3e6ee91b2b6551d223a137a0b8}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost,http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8083}
