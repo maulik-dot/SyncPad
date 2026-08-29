@@ -10,8 +10,7 @@ public class AiActionOption {
     private String icon;
     private String defaultPrompt;
 
-    public AiActionOption() {
-    }
+    public AiActionOption() {}
 
     public AiActionOption(AiActionType action, String label, String description, String icon, String defaultPrompt) {
         this.action = action;
@@ -21,44 +20,18 @@ public class AiActionOption {
         this.defaultPrompt = defaultPrompt;
     }
 
-    public AiActionType getAction() {
-        return action;
-    }
+    public AiActionType getAction() { return action; }
+    public void setAction(AiActionType action) { this.action = action; }
 
-    public void setAction(AiActionType action) {
-        this.action = action;
-    }
+    public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
 
-    public String getLabel() {
-        return label;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public void setLabel(String label) {
-        this.label = label;
-    }
+    public String getIcon() { return icon; }
+    public void setIcon(String icon) { this.icon = icon; }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getIcon() {
-        return icon;
-    }
-
-    public void setIcon(String icon) {
-        this.icon = icon;
-    }
-
-    public String getDefaultPrompt() {
-        return defaultPrompt;
-    }
-
-    public void setDefaultPrompt(String defaultPrompt) {
-        this.defaultPrompt = defaultPrompt;
-    }
+    public String getDefaultPrompt() { return defaultPrompt; }
+    public void setDefaultPrompt(String defaultPrompt) { this.defaultPrompt = defaultPrompt; }
 }
-

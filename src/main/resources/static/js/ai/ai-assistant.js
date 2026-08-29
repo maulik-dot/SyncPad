@@ -50,7 +50,6 @@
         const textBeforeCursor = nodeText.substring(0, offset);
 
         if (textBeforeCursor.endsWith('/ai ') || textBeforeCursor.endsWith('/ai')) {
-            // Remove the /ai text
             const newText = textBeforeCursor.replace(/\/ai\s*$/, '') + nodeText.substring(offset);
             selection.focusNode.textContent = newText;
             openAiPalette();
@@ -380,4 +379,3 @@
         }
     };
 })();
-

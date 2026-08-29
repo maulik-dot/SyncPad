@@ -10,8 +10,7 @@ public class AiGenerateResponse {
     private int estimatedTokens;
     private long latencyMs;
 
-    public AiGenerateResponse() {
-    }
+    public AiGenerateResponse() {}
 
     public AiGenerateResponse(String text, AiActionType action, String modelUsed, int estimatedTokens, long latencyMs) {
         this.text = text;
@@ -21,44 +20,18 @@ public class AiGenerateResponse {
         this.latencyMs = latencyMs;
     }
 
-    public String getText() {
-        return text;
-    }
+    public String getText() { return text; }
+    public void setText(String text) { this.text = text; }
 
-    public void setText(String text) {
-        this.text = text;
-    }
+    public AiActionType getAction() { return action; }
+    public void setAction(AiActionType action) { this.action = action; }
 
-    public AiActionType getAction() {
-        return action;
-    }
+    public String getModelUsed() { return modelUsed; }
+    public void setModelUsed(String modelUsed) { this.modelUsed = modelUsed; }
 
-    public void setAction(AiActionType action) {
-        this.action = action;
-    }
+    public int getEstimatedTokens() { return estimatedTokens; }
+    public void setEstimatedTokens(int estimatedTokens) { this.estimatedTokens = estimatedTokens; }
 
-    public String getModelUsed() {
-        return modelUsed;
-    }
-
-    public void setModelUsed(String modelUsed) {
-        this.modelUsed = modelUsed;
-    }
-
-    public int getEstimatedTokens() {
-        return estimatedTokens;
-    }
-
-    public void setEstimatedTokens(int estimatedTokens) {
-        this.estimatedTokens = estimatedTokens;
-    }
-
-    public long getLatencyMs() {
-        return latencyMs;
-    }
-
-    public void setLatencyMs(long latencyMs) {
-        this.latencyMs = latencyMs;
-    }
+    public long getLatencyMs() { return latencyMs; }
+    public void setLatencyMs(long latencyMs) { this.latencyMs = latencyMs; }
 }
-

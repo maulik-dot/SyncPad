@@ -9,4 +9,3 @@ public enum AiActionType {
     TRANSLATE,
     CUSTOM
 }
-

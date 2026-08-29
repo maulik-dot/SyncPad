@@ -1,0 +1,20 @@
+apiVersion: v2
+name: syncpad
+description: Production Helm Chart for SyncPad Collaborative Document Workspace & Research Canvas
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - collaboration
+  - realtime
+  - documents
+  - springboot
+  - websocket
+  - katex
+home: https://syncpad.io
+sources:
+  - https://github.com/syncpad/syncpad
+maintainers:
+  - name: SyncPad Core Engineering
+    email: engineering@syncpad.io
+

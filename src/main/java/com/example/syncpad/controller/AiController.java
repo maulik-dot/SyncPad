@@ -50,4 +50,3 @@ public class AiController {
         return aiAssistantService.streamGenerate(request, authentication.getName());
     }
 }
-

@@ -1,0 +1,187 @@
+# Default values for syncpad.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: syncpad
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "syncpad-sa"
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/actuator/prometheus"
+  prometheus.io/port: "8082"
+
+podLabels:
+  app.kubernetes.io/component: backend
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8082
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+  hosts:
+    - host: syncpad.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: syncpad-tls-cert
+      hosts:
+        - syncpad.example.com
+
+# Automated TLS Certificate Provisioning via Cert-Manager
+certManager:
+  enabled: true
+  clusterIssuer: "letsencrypt-prod"
+  acmeEmail: "admin@syncpad.io"
+  createClusterIssuer: false
+
+# HashiCorp Vault Agent Sidecar Injector for Zero-Secret Pods
+vault:
+  enabled: true
+  role: "syncpad-app"
+  secretPath: "secret/data/syncpad"
+  agentInject: true
+  annotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "syncpad-app"
+    vault.hashicorp.com/agent-inject-secret-credentials: "secret/data/syncpad"
+    vault.hashicorp.com/agent-inject-template-credentials: |
+      {{- with secret "secret/data/syncpad" -}}
+      export POSTGRES_PASSWORD="{{ .Data.data.POSTGRES_PASSWORD }}"
+      export JWT_SECRET="{{ .Data.data.JWT_SECRET }}"
+      export RABBITMQ_PASSWORD="{{ .Data.data.RABBITMQ_PASSWORD }}"
+      {{- end -}}
+
+# Horizontal Pod Autoscaling (HPA)
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  scaleDown:
+    stabilizationWindowSeconds: 300
+    policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+  scaleUp:
+    stabilizationWindowSeconds: 0
+    policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+    selectPolicy: Max
+  # Optional custom Prometheus metric (e.g. HTTP request rate)
+  customMetrics: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8082
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8082
+  initialDelaySeconds: 20
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+# Application Runtime Configuration & Environment
+env:
+  SPRING_PROFILES_ACTIVE: "prod"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://syncpad-postgres:5432/syncpad_db"
+  SPRING_DATASOURCE_USERNAME: "syncpad_user"
+  SPRING_WEBSOCKET_RELAY_HOST: "syncpad-rabbitmq"
+  SPRING_WEBSOCKET_RELAY_PORT: "61613"
+  SYNCPAD_RATELIMIT_LOGIN_LIMIT: "500"
+  SYNCPAD_RATELIMIT_REGISTER_LIMIT: "500"
+  SYNCPAD_RATELIMIT_WS_LIMIT: "10000"
+  JAVA_TOOL_OPTIONS: "-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
+# Fallback Secret (used only when Vault Agent Injection is disabled)
+secrets:
+  databasePassword: "CHANGE_ME_IN_PRODUCTION"
+  jwtSecret: "CHANGE_ME_TO_STRONG_256_BIT_SECRET"
+  rabbitmqPassword: "CHANGE_ME_TO_STRONG_RABBITMQ_PASS"
+
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - syncpad
+          topologyKey: kubernetes.io/hostname
+
