@@ -45,6 +45,48 @@
 
     <!-- SyncPad Character-Level CRDT Collaboration Engine -->
     <script src="js/crdt/syncpad-crdt.js"></script>
+
+    <!-- SyncPad Progressive Web App & Offline Storage Engine -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
+    <script src="js/offline/syncpad-offline.js"></script>
+    <script>
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    console.log('[PWA] Service Worker registered with scope:', reg.scope);
+                }).catch((err) => {
+                    console.warn('[PWA] Service Worker registration failed:', err);
+                });
+            });
+        }
+
+        // Handle PWA Installation Prompt
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('pwaInstallBtn');
+            if (installBtn) installBtn.style.display = 'inline-flex';
+        });
+
+        window.triggerPwaInstall = async function () {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const choice = await deferredPrompt.userChoice;
+            console.log('[PWA] Install prompt choice:', choice.outcome);
+            deferredPrompt = null;
+            const installBtn = document.getElementById('pwaInstallBtn');
+            if (installBtn) installBtn.style.display = 'none';
+        };
+    </script>
     
     <!-- Custom Design System Stylesheet -->
     <link rel="stylesheet" href="app.css">
@@ -594,6 +636,16 @@
                                 <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i>
                                 <span id="docSaveText">Saved</span>
                             </span>
+
+                            <!-- PWA Network status badge (Online / Offline) -->
+                            <span id="networkStatusBadge" class="network-badge online" title="Connection Status" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 500; padding: 2px 8px; border-radius: 9999px; background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.2); cursor: default; white-space: nowrap;">
+                                <span class="status-dot online" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> Online
+                            </span>
+
+                            <!-- PWA Install Button (hidden until prompt is available) -->
+                            <button id="pwaInstallBtn" class="btn btn-outline btn-xs" onclick="triggerPwaInstall()" title="Install SyncPad App" style="display:none; align-items: center; gap: 4px; border-color: #4f46e5; color: #4f46e5; padding: 2px 8px; font-size: 0.72rem; border-radius: 9999px;">
+                                <i data-lucide="download" style="width:11px;height:11px;"></i> Install App
+                            </button>
                         </div>
 
                         <!-- Right Actions -->
@@ -5296,6 +5348,9 @@
         // ITEM VIEW & NAVIGATION
         function openItemView(item) {
             currentDoc = item;
+            if (window.SyncPadOffline && item) {
+                window.SyncPadOffline.cacheDocument(item);
+            }
             document.getElementById('homeView').classList.add('hidden');
             document.getElementById('dashboardView').classList.add('hidden');
             document.getElementById('folderView').classList.add('hidden');
@@ -9793,6 +9848,9 @@ async function openDocInfoModal() {
                         currentDoc.content = updated.content;
                         syncDocumentInLists(currentDoc.id, updated.title, updated.content);
 
+                        if (window.SyncPadOffline) {
+                            window.SyncPadOffline.cacheDocument(updated);
+                        }
                         if (pill) {
                             pill.className = 'doc-save-pill saved';
                             if (text) text.textContent = 'Saved just now';
@@ -9809,9 +9867,13 @@ async function openDocInfoModal() {
                         }
                     }
                 } catch (e) {
-                    if (pill) {
-                        pill.className = 'doc-save-pill';
-                        if (text) text.textContent = 'Offline';
+                    if (window.SyncPadOffline) {
+                        window.SyncPadOffline.saveDocumentOffline(currentDoc.id, titleVal, contentVal);
+                    } else {
+                        if (pill) {
+                            pill.className = 'doc-save-pill';
+                            if (text) text.textContent = 'Offline';
+                        }
                     }
                 }
             }, 600);

@@ -57,6 +57,8 @@ public class SecurityConfig {
                     "/ws/**",
                     "/",
                     "/index.html",
+                    "/manifest.json",
+                    "/icons/**",
                     "/*.js",
                     "/*.css",
                     "/js/**",

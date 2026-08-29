@@ -692,6 +692,36 @@ async function runSuite() {
   })
   assert(unauthAiRes.status === 403, `Unauthorized AI document access blocked (403 Forbidden)`)
 
+  // -------------------------------------------------------------
+  // Scenario 17: Progressive Web App (PWA) & Offline Mobile Mode
+  // -------------------------------------------------------------
+  console.log(`\n--> Scenario 17: Progressive Web App (PWA) & Offline Mobile Mode`)
+
+  // 1. GET /manifest.json returns 200 OK and valid PWA manifest
+  const manifestRes = await request('/manifest.json')
+  assert(manifestRes.status === 200, `GET /manifest.json returns 200 OK`)
+  assert(manifestRes.body.name === 'SyncPad Collaborative Workspace', `Manifest declares correct app name`)
+  assert(manifestRes.body.display === 'standalone', `Manifest specifies standalone display mode`)
+  assert(manifestRes.body.icons && manifestRes.body.icons.length >= 4, `Manifest includes high-res PNG and SVG icons`)
+
+  // 2. GET /sw.js returns 200 OK with Service Worker implementation
+  const swRes = await request('/sw.js')
+  assert(swRes.status === 200, `GET /sw.js returns 200 OK`)
+  assert(typeof swRes.body === 'string' && swRes.body.includes('syncpad-v1-cache'), `Service Worker manages cache lifecycle`)
+
+  // 3. GET /icons/icon-192.png returns 200 OK
+  const iconPngRes = await request('/icons/icon-192.png')
+  assert(iconPngRes.status === 200, `GET /icons/icon-192.png returns 200 OK`)
+
+  // 4. GET /icons/icon-192.svg returns 200 OK
+  const iconSvgRes = await request('/icons/icon-192.svg')
+  assert(iconSvgRes.status === 200, `GET /icons/icon-192.svg returns 200 OK`)
+
+  // 5. GET /js/offline/syncpad-offline.js returns 200 OK
+  const offlineJsRes = await request('/js/offline/syncpad-offline.js')
+  assert(offlineJsRes.status === 200, `GET /js/offline/syncpad-offline.js returns 200 OK`)
+  assert(typeof offlineJsRes.body === 'string' && offlineJsRes.body.includes('SyncPadOfflineDB'), `IndexedDB offline storage manager loaded`)
+
   console.log(`\n============================================================`)
   console.log(` E2E Verification Complete: ${testsPassed}/${testsRun} Assertions Passed!`)
   console.log(`============================================================\n`)
