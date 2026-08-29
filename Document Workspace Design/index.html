@@ -40,6 +40,54 @@
     <script src="js/export/docx-exporter.js"></script>
     <script src="js/export/export-preview-modal.js"></script>
     
+    <!-- SyncPad AI Document Assistant & Gemini Copilot -->
+    <script src="js/ai/ai-assistant.js"></script>
+
+    <!-- SyncPad Character-Level CRDT Collaboration Engine -->
+    <script src="js/crdt/syncpad-crdt.js"></script>
+
+    <!-- SyncPad Progressive Web App & Offline Storage Engine -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
+    <script src="js/offline/syncpad-offline.js"></script>
+    <script>
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    console.log('[PWA] Service Worker registered with scope:', reg.scope);
+                }).catch((err) => {
+                    console.warn('[PWA] Service Worker registration failed:', err);
+                });
+            });
+        }
+
+        // Handle PWA Installation Prompt
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('pwaInstallBtn');
+            if (installBtn) installBtn.style.display = 'inline-flex';
+        });
+
+        window.triggerPwaInstall = async function () {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const choice = await deferredPrompt.userChoice;
+            console.log('[PWA] Install prompt choice:', choice.outcome);
+            deferredPrompt = null;
+            const installBtn = document.getElementById('pwaInstallBtn');
+            if (installBtn) installBtn.style.display = 'none';
+        };
+    </script>
+    
     <!-- Custom Design System Stylesheet -->
     <link rel="stylesheet" href="app.css">
 </head>
@@ -97,6 +145,12 @@
                     <span>Continue with Google</span>
                 </button>
 
+                <!-- ENTERPRISE SSO BUTTON -->
+                <button onclick="openSsoModal()" class="btn btn-outline" style="width: 100%; justify-content: center; gap: 0.65rem; padding: 0.6rem; margin-top: 0.5rem; background: var(--bg-surface);">
+                    <i data-lucide="building-2" style="width:16px;height:16px;color:#4f46e5;"></i>
+                    <span>Single Sign-On (SSO / Okta / Azure)</span>
+                </button>
+
                 <p style="text-align: center; font-size: 0.8rem; margin-top: 1.5rem; color: var(--text-secondary);">
                     Don't have an account? 
                     <a href="#" onclick="toggleAuthMode('register')" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Create account</a>
@@ -135,6 +189,31 @@
                     Already have an account? 
                     <a href="#" onclick="toggleAuthMode('login')" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Sign in</a>
                 </p>
+            </div>
+
+            <!-- SSO DOMAIN DISCOVERY MODAL -->
+            <div id="ssoModal" class="modal-backdrop hidden" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center;">
+                <div class="card" style="width: 100%; max-width: 420px; padding: 2rem; box-shadow: var(--shadow-xl); background: var(--bg-surface); border-radius: var(--radius-lg);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.15rem; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="shield-check" style="width: 20px; height: 20px; color: #4f46e5;"></i>
+                            Corporate Single Sign-On
+                        </h3>
+                        <button type="button" class="btn btn-icon btn-sm" onclick="closeSsoModal()"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+                    </div>
+                    <p style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.25rem;">
+                        Enter your enterprise work email. SyncPad will automatically discover your organization's Identity Provider (Okta, Microsoft Entra ID, SAML 2.0).
+                    </p>
+                    <form onsubmit="handleSsoDiscover(event)">
+                        <div class="input-group" style="margin-bottom: 1.25rem;">
+                            <label class="input-label">Work Email</label>
+                            <input type="email" id="ssoWorkEmail" class="input" placeholder="name@company.com" required value="alex@okta.com">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                            Continue with Identity Provider
+                        </button>
+                    </form>
+                </div>
             </div>
 
         </div>
@@ -588,6 +667,16 @@
                                 <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i>
                                 <span id="docSaveText">Saved</span>
                             </span>
+
+                            <!-- PWA Network status badge (Online / Offline) -->
+                            <span id="networkStatusBadge" class="network-badge online" title="Connection Status" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 500; padding: 2px 8px; border-radius: 9999px; background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.2); cursor: default; white-space: nowrap;">
+                                <span class="status-dot online" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> Online
+                            </span>
+
+                            <!-- PWA Install Button (hidden until prompt is available) -->
+                            <button id="pwaInstallBtn" class="btn btn-outline btn-xs" onclick="triggerPwaInstall()" title="Install SyncPad App" style="display:none; align-items: center; gap: 4px; border-color: #4f46e5; color: #4f46e5; padding: 2px 8px; font-size: 0.72rem; border-radius: 9999px;">
+                                <i data-lucide="download" style="width:11px;height:11px;"></i> Install App
+                            </button>
                         </div>
 
                         <!-- Right Actions -->
@@ -894,6 +983,17 @@
                             <button class="btn btn-secondary" id="annotationToggleBtn" onclick="toggleAnnotationMode()" style="height: 30px; padding: 0.25rem 0.65rem; font-size: 0.78rem; gap: 0.4rem;" title="Toggle Document Annotations">
                                 <i data-lucide="pen-tool" style="width:14px;height:14px;"></i>
                                 <span id="annotationBtnText">Annotate</span>
+                            </button>
+                        </div>
+
+                        <!-- AI Document Assistant / Copilot Trigger -->
+                        <div class="doc-tool-group">
+                            <button class="btn doc-ai-btn" id="docAiAssistantBtn" onclick="openAiPalette()" style="height: 30px; padding: 0.25rem 0.75rem; font-size: 0.78rem; gap: 0.4rem;" title="Ask AI / Generate with Gemini (Cmd+J)">
+                                <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                                <span>Ask AI</span>
+                            </button>
+                            <button class="btn btn-secondary" id="copilotDrawerBtn" onclick="toggleAiCopilotDrawer()" style="height: 30px; padding: 0.25rem 0.5rem; font-size: 0.78rem;" title="Toggle AI Copilot Chat">
+                                <i data-lucide="bot" style="width:14px;height:14px;"></i>
                             </button>
                         </div>
                     </div>
@@ -2769,6 +2869,74 @@
                 }
             } catch (err) {
                 toast('Registration failed. Please check connection.');
+            }
+        }
+
+        function openSsoModal() {
+            const modal = document.getElementById('ssoModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+
+        function closeSsoModal() {
+            const modal = document.getElementById('ssoModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+        }
+
+        async function handleSsoDiscover(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('ssoWorkEmail');
+            const email = emailInput ? emailInput.value.trim() : '';
+            if (!email) return;
+
+            try {
+                const res = await fetch('/auth/sso/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                if (res.ok) {
+                    const provider = await res.json();
+                    toast(`Authenticating with ${provider.displayName || 'SSO Provider'}...`);
+
+                    // Execute SSO Login with JIT provisioning
+                    const loginRes = await fetch('/auth/sso/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            provider: provider.provider,
+                            email: email,
+                            name: email.split('@')[0],
+                            assertion: 'corporate-saml-sso-token'
+                        })
+                    });
+
+                    if (loginRes.ok) {
+                        const data = await loginRes.json();
+                        token = data.accessToken || data.token;
+                        localStorage.setItem('syncpad_token', token);
+                        currentUser = { id: data.id, name: data.name || email.split('@')[0], email: data.email || email };
+                        localStorage.setItem('syncpad_user', JSON.stringify(currentUser));
+                        closeSsoModal();
+                        showMainShell();
+                        loadUserWorkspaces();
+                        toast(`Signed in via Enterprise SSO (${provider.displayName})!`);
+                    } else {
+                        const err = await loginRes.json().catch(() => ({}));
+                        toast(err.message || 'SSO authentication rejected');
+                    }
+                } else {
+                    toast('SSO identity provider not found for this domain');
+                }
+            } catch (err) {
+                toast('Error connecting to enterprise SSO service');
             }
         }
 
@@ -5279,6 +5447,9 @@
         // ITEM VIEW & NAVIGATION
         function openItemView(item) {
             currentDoc = item;
+            if (window.SyncPadOffline && item) {
+                window.SyncPadOffline.cacheDocument(item);
+            }
             document.getElementById('homeView').classList.add('hidden');
             document.getElementById('dashboardView').classList.add('hidden');
             document.getElementById('folderView').classList.add('hidden');
@@ -9776,6 +9947,9 @@ async function openDocInfoModal() {
                         currentDoc.content = updated.content;
                         syncDocumentInLists(currentDoc.id, updated.title, updated.content);
 
+                        if (window.SyncPadOffline) {
+                            window.SyncPadOffline.cacheDocument(updated);
+                        }
                         if (pill) {
                             pill.className = 'doc-save-pill saved';
                             if (text) text.textContent = 'Saved just now';
@@ -9792,9 +9966,13 @@ async function openDocInfoModal() {
                         }
                     }
                 } catch (e) {
-                    if (pill) {
-                        pill.className = 'doc-save-pill';
-                        if (text) text.textContent = 'Offline';
+                    if (window.SyncPadOffline) {
+                        window.SyncPadOffline.saveDocumentOffline(currentDoc.id, titleVal, contentVal);
+                    } else {
+                        if (pill) {
+                            pill.className = 'doc-save-pill';
+                            if (text) text.textContent = 'Offline';
+                        }
                     }
                 }
             }, 600);
@@ -10360,6 +10538,7 @@ async function openDocInfoModal() {
         // REAL-TIME DOCUMENT COLLABORATION ENGINE
         // ==========================================
         let docStompSubscription = null;
+        let docCrdtSubscription = null;
         let activeDocCollaborators = new Map(); // email -> { name, email, color, lastSeen }
         let collabRemoteCursors = new Map(); // email -> { el, caret, flag, color, timer }
         let docEditBroadcastTimeout = null;
@@ -10659,6 +10838,20 @@ async function openDocInfoModal() {
                             }
                         });
 
+                        // Character-level CRDT channel subscription
+                        docCrdtSubscription = stompClient.subscribe(`/topic/documents.${docId}.crdt`, (message) => {
+                            try {
+                                const op = JSON.parse(message.body);
+                                handleRemoteCrdtOperation(op);
+                            } catch (e) {
+                                console.error('Error parsing CRDT message:', e);
+                            }
+                        });
+
+                        if (window.SyncPadCrdt && currentDoc) {
+                            window.SyncPadCrdt.init(docId, currentDoc.content || '', currentUser ? currentUser.email : null);
+                        }
+
                         broadcastDocumentPresence('JOIN');
                     } catch (e) {
                         console.warn('Document subscription failed:', e);
@@ -10671,6 +10864,35 @@ async function openDocInfoModal() {
             trySubscribe();
         }
 
+        function handleRemoteCrdtOperation(op) {
+            if (!op || !currentDoc || Number(op.documentId) !== Number(currentDoc.id)) return;
+            if (currentUser && op.senderEmail === currentUser.email) return;
+
+            if (window.SyncPadCrdt) {
+                const applied = window.SyncPadCrdt.applyRemote(op);
+                if (applied) {
+                    const sheet = document.getElementById('docPageSheet');
+                    if (sheet) {
+                        const isFocused = (document.activeElement === sheet || sheet.contains(document.activeElement));
+                        const savedOffset = isFocused ? getCaretCharacterOffsetWithin(sheet) : -1;
+
+                        isReceivingRemoteEdit = true;
+                        const newText = window.SyncPadCrdt.toText();
+                        sheet.innerHTML = newText;
+                        currentDoc.content = newText;
+
+                        if (isFocused && savedOffset >= 0) {
+                            try {
+                                setCaretCharacterOffsetWithin(sheet, savedOffset);
+                            } catch (e) {}
+                        }
+                        isReceivingRemoteEdit = false;
+                    }
+                    showRemoteCollaboratorActivity(op.senderEmail ? op.senderEmail.split('@')[0] : 'Collaborator');
+                }
+            }
+        }
+
         function unsubscribeDocumentCollaboration() {
             if (docStompSubscription) {
                 try {
@@ -10678,6 +10900,12 @@ async function openDocInfoModal() {
                     docStompSubscription.unsubscribe();
                 } catch (e) {}
                 docStompSubscription = null;
+            }
+            if (docCrdtSubscription) {
+                try {
+                    docCrdtSubscription.unsubscribe();
+                } catch (e) {}
+                docCrdtSubscription = null;
             }
             activeDocCollaborators.clear();
             clearAllRemoteCursors();
@@ -10793,6 +11021,7 @@ async function openDocInfoModal() {
                 if (pill) {
                     pill.className = 'doc-save-pill saved';
                     if (text) text.textContent = `Saved by ${data.senderName || 'collaborator'}`;
+                }
             } else if (data.type === 'COMMENT' || data.type === 'COMMENT_ADDED') {
                 if (currentDoc && currentDoc.id) {
                     loadDocComments(currentDoc.id);
@@ -11757,6 +11986,7 @@ async function openDocInfoModal() {
             if (wsMenu && !wsMenu.classList.contains('hidden') && !wsMenu.contains(e.target) && !wsBtn) {
                 wsMenu.classList.add('hidden');
             }
+        });
         // =========================================================================
         // TEMPLATES & BLUEPRINT GALLERY JS ENGINE
         // =========================================================================
@@ -12148,5 +12378,98 @@ async function openDocInfoModal() {
         initOfflineDb();
 
     </script>
+
+    <!-- ========================================================================= -->
+    <!-- FLOATING AI COMMAND PALETTE (Cmd+J / /ai) -->
+    <!-- ========================================================================= -->
+    <div id="docAiPalette" class="doc-ai-palette hidden">
+        <div class="doc-ai-palette-header">
+            <i data-lucide="sparkles" style="width:18px;height:18px;color:#8b5cf6;flex-shrink:0;"></i>
+            <input type="text" id="aiPromptInput" class="doc-ai-input" placeholder="Ask AI to write, summarize, or edit... (Press Enter)" onkeydown="if(event.key==='Enter')submitAiPrompt()">
+            <span id="aiSelectionBadge" class="badge badge-outline hidden" style="font-size:0.7rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <button class="btn btn-icon" onclick="closeAiPalette()" style="width:24px;height:24px;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+        </div>
+        <div class="doc-ai-actions-grid">
+            <button class="doc-ai-action-card" onclick="executeAiAction('SUMMARIZE')">
+                <i data-lucide="sparkles" style="width:18px;height:18px;color:#8b5cf6;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Summarize</div>
+                    <div class="doc-ai-action-desc">Key takeaways & bulleted brief</div>
+                </div>
+            </button>
+            <button class="doc-ai-action-card" onclick="executeAiAction('ACTION_ITEMS')">
+                <i data-lucide="check-square" style="width:18px;height:18px;color:#10b981;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Action Items</div>
+                    <div class="doc-ai-action-desc">Extract tasks & deliverables</div>
+                </div>
+            </button>
+            <button class="doc-ai-action-card" onclick="executeAiAction('EXPAND')">
+                <i data-lucide="pen-tool" style="width:18px;height:18px;color:#3b82f6;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Continue Writing</div>
+                    <div class="doc-ai-action-desc">Elaborate on current context</div>
+                </div>
+            </button>
+            <button class="doc-ai-action-card" onclick="executeAiAction('FIX_GRAMMAR')">
+                <i data-lucide="wand-2" style="width:18px;height:18px;color:#ec4899;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Improve Writing</div>
+                    <div class="doc-ai-action-desc">Fix grammar & polish flow</div>
+                </div>
+            </button>
+            <button class="doc-ai-action-card" onclick="executeAiAction('OUTLINE')">
+                <i data-lucide="list-tree" style="width:18px;height:18px;color:#f59e0b;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Create Outline</div>
+                    <div class="doc-ai-action-desc">Draft structured document spec</div>
+                </div>
+            </button>
+            <button class="doc-ai-action-card" onclick="executeAiAction('TRANSLATE')">
+                <i data-lucide="languages" style="width:18px;height:18px;color:#06b6d4;margin-top:2px;"></i>
+                <div>
+                    <div class="doc-ai-action-title">Translate</div>
+                    <div class="doc-ai-action-desc">Translate to Spanish / French / German</div>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- FLOATING AI STREAMING RESULT CARD -->
+    <div id="docAiResultCard" class="doc-ai-result-card hidden">
+        <div class="doc-ai-result-header">
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+                <i data-lucide="sparkles" style="width:14px;height:14px;color:#8b5cf6;"></i>
+                <span id="docAiResultStatus">SyncPad AI is generating...</span>
+            </div>
+            <button class="btn btn-icon" onclick="closeAiResultCard()" style="width:24px;height:24px;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+        </div>
+        <div id="docAiResultContent" class="doc-ai-result-body"></div>
+        <div id="docAiActionButtons" class="hidden" style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1rem;background:var(--bg-surface-hover,#f8fafc);border-top:1px solid var(--border-color,#e2e8f0);">
+            <button class="btn btn-outline btn-sm" onclick="copyAiResult()" title="Copy Markdown"><i data-lucide="copy" style="width:12px;height:12px;"></i> Copy</button>
+            <button class="btn btn-secondary btn-sm" id="aiReplaceSelectionBtn" onclick="replaceAiSelection()"><i data-lucide="check" style="width:12px;height:12px;"></i> Replace Selection</button>
+            <button class="btn btn-primary btn-sm" onclick="insertAiResultBelow()"><i data-lucide="corner-down-left" style="width:12px;height:12px;"></i> Insert Below</button>
+        </div>
+    </div>
+
+    <!-- AI COPILOT SIDEBAR DRAWER -->
+    <div id="aiCopilotDrawer" class="ai-copilot-drawer">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--border-color);background:var(--bg-surface-hover);">
+            <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.92rem;">
+                <i data-lucide="bot" style="width:18px;height:18px;color:#6366f1;"></i>
+                <span>Gemini Document Copilot</span>
+            </div>
+            <button class="btn btn-icon" onclick="toggleAiCopilotDrawer()" style="width:26px;height:26px;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+        </div>
+        <div id="copilotMessagesList" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;">
+            <div class="copilot-msg copilot-msg-ai">
+                👋 Hello! I am your SyncPad Copilot. Ask me questions about this document, request summaries, or ask for rewrites!
+            </div>
+        </div>
+        <div style="padding:0.75rem;border-top:1px solid var(--border-color);display:flex;gap:0.5rem;background:var(--bg-surface);">
+            <input type="text" id="copilotChatInput" class="input" placeholder="Ask about this document..." onkeydown="if(event.key==='Enter')sendCopilotMessage()" style="flex:1;font-size:0.84rem;">
+            <button class="btn btn-primary" onclick="sendCopilotMessage()" style="padding:0.4rem 0.75rem;"><i data-lucide="send" style="width:14px;height:14px;"></i></button>
+        </div>
+    </div>
 </body>
 </html>

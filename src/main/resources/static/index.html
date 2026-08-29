@@ -11021,6 +11021,7 @@ async function openDocInfoModal() {
                 if (pill) {
                     pill.className = 'doc-save-pill saved';
                     if (text) text.textContent = `Saved by ${data.senderName || 'collaborator'}`;
+                }
             } else if (data.type === 'COMMENT' || data.type === 'COMMENT_ADDED') {
                 if (currentDoc && currentDoc.id) {
                     loadDocComments(currentDoc.id);
@@ -11985,6 +11986,7 @@ async function openDocInfoModal() {
             if (wsMenu && !wsMenu.classList.contains('hidden') && !wsMenu.contains(e.target) && !wsBtn) {
                 wsMenu.classList.add('hidden');
             }
+        });
         // =========================================================================
         // TEMPLATES & BLUEPRINT GALLERY JS ENGINE
         // =========================================================================

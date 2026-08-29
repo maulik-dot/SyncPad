@@ -1,21 +1,11 @@
-# Stage 1: Build the frontend
-FROM node:22-alpine AS frontend-build
-WORKDIR /frontend
-RUN npm install -g pnpm
-COPY ["Document Workspace Design/package.json", "Document Workspace Design/pnpm-lock.yaml", "./"]
-RUN pnpm install --frozen-lockfile
-COPY ["Document Workspace Design/", "./"]
-RUN pnpm build
-
-# Stage 2: Build the backend
+# Stage 1: Build the backend
 FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
-COPY --from=frontend-build /frontend/dist ./src/main/resources/static
 RUN mvn clean package -DskipTests
 
-# Stage 3: Runtime stage (Non-Root Unprivileged)
+# Stage 2: Runtime stage (Non-Root Unprivileged)
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
