@@ -63,6 +63,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    reg.update();
                     console.log('[PWA] Service Worker registered with scope:', reg.scope);
                 }).catch((err) => {
                     console.warn('[PWA] Service Worker registration failed:', err);
@@ -986,8 +987,17 @@
                                 <button class="doc-menu-item" onclick="insertElement('latex')"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-family: 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">L<sup>A</sup>T<sub>E</sub>X</span> LaTeX Equation</span><span style="font-size: 0.7rem; color: var(--text-muted);">⌘M</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('divider')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="minus" style="width:14px;height:14px;"></i> Divider</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('mention')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="at-sign" style="width:14px;height:14px;"></i> Mention @</span></button>
-                                <button class="doc-menu-item" onclick="insertElement('comment')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="message-square-plus" style="width:14px;height:14px;"></i> Add comment</span></button>
                             </div>
+                        </div>
+
+                        <!-- LaTeX & Math Quick Tools -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon" id="btnToolbarLatex" onclick="insertElement('latex')" title="Insert LaTeX Equation Box (⌘M)" style="font-family: 'Times New Roman', serif; font-weight: 700; font-style: italic; color: #8b5cf6; font-size: 1.05rem;">
+                                ∑
+                            </button>
+                            <button class="btn btn-icon" id="btnToolbarFormatMath" onclick="if(window.latexEngine)window.latexEngine.compileAllMathInDocument();" title="Format All Math in Document ($)" style="color: #8b5cf6; font-weight: 700; font-size: 0.72rem; padding: 0 4px;">
+                                $$
+                            </button>
                         </div>
 
                         <!-- Annotation Overlay Toggle -->
@@ -8180,8 +8190,8 @@
                         }
                     }, 60);
 
-                    if (typeof showToastNotification === 'function') {
-                        showToastNotification('Inserted LaTeX equation card!', 'success');
+                    if (typeof toast === 'function') {
+                        toast('LaTeX equation box inserted!');
                     }
                 }
             }

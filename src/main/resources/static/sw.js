@@ -1,11 +1,12 @@
-// SyncPad Service Worker (sw.js)
-const CACHE_NAME = 'syncpad-v1-cache';
+// SyncPad Service Worker (sw.js) v5 - network first for html & scripts
+const CACHE_NAME = 'syncpad-v5-cache';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/app.css',
   '/js/offline/syncpad-offline.js',
+  '/js/doc/latex-compiler.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-192.svg',
@@ -28,6 +29,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Clearing obsolete cache:', key);
             return caches.delete(key);
           }
         })
@@ -44,9 +46,39 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Bypass service worker for AI streaming/generation and non-GET to avoid breaking SSE
+  if (request.method !== 'GET' || url.pathname.startsWith('/api/ai/')) {
+    return;
+  }
+
   if (url.pathname.startsWith('/api') || url.pathname.startsWith('/documents') || url.pathname.startsWith('/workspaces') || url.pathname.startsWith('/auth')) {
     event.respondWith(
       fetch(request).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Network-first for HTML and scripts so users always receive fresh code updates
+  if (
+    request.headers.get('accept')?.includes('text/html') ||
+    url.pathname.endsWith('.html') ||
+    url.pathname === '/' ||
+    url.pathname.startsWith('/js/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
