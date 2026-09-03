@@ -655,70 +655,27 @@
             return `\n\n__LATEX_CARD_BLOCK_${idx}__\n\n`;
         });
 
-        // 2. Extract code blocks (```lang ... ```)
         processed = processed.replace(/```(\w+)?\s*[\r\n]+([\s\S]*?)```/g, (match, lang, code) => {
             const idx = codeBlocks.length;
             codeBlocks.push({ lang: (lang || 'javascript').toLowerCase(), code: code.trim() });
             return `\n\n__CODE_CARD_BLOCK_${idx}__\n\n`;
         });
 
-        // 3. Extract inline math ($...$ or \(...\)) BEFORE markdown processing to preserve formulas intact
-        const inlineLatexBlocks = [];
-        processed = processed.replace(/(?<!\$)\$([^\$\r\n]+?)\$(?!\$)/g, (match, formula) => {
-            const idx = inlineLatexBlocks.length;
-            inlineLatexBlocks.push(formula.trim());
-            return `__INLINE_LATEX_${idx}__`;
-        });
-
-        processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (match, formula) => {
-            const idx = inlineLatexBlocks.length;
-            inlineLatexBlocks.push(formula.trim());
-            return `__INLINE_LATEX_${idx}__`;
-        });
-
-        // 4. Format markdown typography & layout
         processed = processed
-            .replace(/^###### (.*$)/gim, '<h6>$1</h6>')
-            .replace(/^##### (.*$)/gim, '<h5>$1</h5>')
-            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
             .replace(/^### (.*$)/gim, '<h3>$1</h3>')
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
             .replace(/^# (.*$)/gim, '<h1>$1</h1>')
             .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-            .replace(/^[ \t]*[-*] \[ \] (.*$)/gim, '<li class="doc-checklist-item"><span class="doc-checklist-checkbox"><input type="checkbox"></span><span>$1</span></li>')
-            .replace(/^[ \t]*[-*] \[x\] (.*$)/gim, '<li class="doc-checklist-item"><span class="doc-checklist-checkbox"><input type="checkbox" checked></span><span>$1</span></li>')
-            .replace(/^[ \t]*[-*] (.*$)/gim, '<li>$1</li>')
-            .replace(/^[ \t]*(\d+)\. (.*$)/gim, '<p><strong>$1.</strong> $2</p>')
+            .replace(/^- \[ \] (.*$)/gim, '<li class="doc-checklist-item"><span class="doc-checklist-checkbox"><input type="checkbox"></span><span>$1</span></li>')
+            .replace(/^- \[x\] (.*$)/gim, '<li class="doc-checklist-item"><span class="doc-checklist-checkbox"><input type="checkbox" checked></span><span>$1</span></li>')
+            .replace(/^- (.*$)/gim, '<li>$1</li>')
             .replace(/\n\n+/gim, '</p><p>')
             .replace(/\n/gim, '<br>');
 
         processed = '<p>' + processed + '</p>';
         processed = processed.replace(/<p>\s*<\/p>/g, '');
 
-        // Wrap adjacent <li> elements cleanly in <ul>
-        processed = processed.replace(/((?:<li>.*?<\/li>(?:<br\s*\/?>)*)+)/gis, '<ul>$1</ul>');
-        processed = processed.replace(/<ul>(.*?)<\/ul>/gis, (m, inner) => '<ul>' + inner.replace(/<br\s*\/?>/gi, '') + '</ul>');
-
-        // 5. Restore inline LaTeX equations as interactive KaTeX spans
-        inlineLatexBlocks.forEach((formula, idx) => {
-            let rendered = '';
-            if (window.latexEngine && typeof window.latexEngine.renderToString === 'function') {
-                rendered = window.latexEngine.renderToString(formula, false);
-            } else if (typeof window.katex !== 'undefined' && typeof window.katex.renderToString === 'function') {
-                try {
-                    rendered = window.katex.renderToString(formula, { displayMode: false, throwOnError: false });
-                } catch (e) {
-                    rendered = formula;
-                }
-            } else {
-                rendered = formula;
-            }
-            const inlineHtml = `<span class="doc-latex-inline is-compiled" data-latex-source="${escapeHtmlAttr(formula)}" onclick="window.latexEngine?.openInlineEditor?.(this, event)" title="Click to edit in LaTeX box">${rendered}</span>`;
-            processed = processed.split(`__INLINE_LATEX_${idx}__`).join(inlineHtml);
-        });
-
-        // 6. Restore block LaTeX equation cards
         latexBlocks.forEach((formula, idx) => {
             let cardHtml = '';
             if (window.latexEngine && typeof window.latexEngine.generateCardHtml === 'function') {
@@ -731,7 +688,6 @@
             processed = processed.replace(regex, cardHtml);
         });
 
-        // 7. Restore code snippet cards
         codeBlocks.forEach((item, idx) => {
             const escapedCode = escapeHtmlAttr(item.code);
             const cardHtml = `
@@ -752,8 +708,6 @@
 
         return processed;
     }
-
-    window.renderMarkdownToHtml = renderMarkdownToHtml;
 
     function escapeHtmlAttr(str) {
         if (!str) return '';

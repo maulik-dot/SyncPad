@@ -21,7 +21,7 @@ class SyncPadLatexEngine {
             { label: 'Calculus', icon: 'dy/dx', code: '\\frac{d}{dx}\\left( x^n \\right) = n x^{n-1}' },
             { label: 'Pythagorean', icon: 'a²+b²', code: 'a^2 + b^2 = c^2' },
             { label: 'Greek', icon: 'α,β,θ', code: '\\alpha + \\beta = \\theta' },
-            { label: 'Aligned Definitions', icon: '{x=text}', code: '\\begin{array}{rll}\n  T & = \\text{Temperature} & (\\text{K}) \\\\\n  t & = \\text{Time} & (\\text{s}) \\\\\n  \\rho & = \\text{Density} & (\\text{kg/m}^3)\n\\end{array}' }
+            { label: 'Aligned Definitions', icon: '{x=text}', code: '\\begin{array}{rll}\n  T & = \\text{Temperature field} & (\\text{K}\\text{ or }^{\\circ}\\text{C}) \\\\\n  t & = \\text{Time} & (\\text{s}) \\\\\n  \\rho & = \\text{Density of the medium} & (\\text{kg/m}^3) \\\\\n  c_p & = \\text{Specific heat capacity at constant pressure} & (\\text{J/kg}\\cdot\\text{K}) \\\\\n  k & = \\text{Thermal conductivity} & (\\text{W/m}\\cdot\\text{K}) \\\\\n  \\dot{q} & = \\text{Volumetric internal heat generation rate} & (\\text{W/m}^3)\n\\end{array}' }
         ];
 
         // Global outside click & escape listeners for the hover card
@@ -44,7 +44,6 @@ class SyncPadLatexEngine {
     /**
      * Compiles raw LaTeX string into HTML
      * @param {string} latexSource 
-     * @param {boolean} displayMode
      * @returns {string} Compiled HTML
      */
     renderToString(latexSource, displayMode = true) {
@@ -106,17 +105,16 @@ class SyncPadLatexEngine {
                 let unit = '';
                 let desc = rest;
                 if (unitMatch) {
-                    unit = unitMatch[0].trim();
-                    desc = rest.substring(0, rest.length - unit.length).trim();
+                    unit = this.formatLatexUnit(unitMatch[0].trim());
+                    desc = rest.substring(0, rest.length - unitMatch[0].length).trim();
                 }
-                unit = unit.replace(/\$([^\$]+)\$/g, '$1');
                 parsedRows.push({ sym, desc, unit });
             }
         }
 
         if (parsedRows.length >= 2) {
             const body = parsedRows.map(r => {
-                const u = r.unit ? ` & \\text{${r.unit}}` : ' &';
+                const u = r.unit ? ` & ${r.unit}` : ' &';
                 return `  ${r.sym} & = \\text{${r.desc}} ${u}`;
             }).join(' \\\\\n');
             return `\\begin{array}{rll}\n${body}\n\\end{array}`;
@@ -125,90 +123,35 @@ class SyncPadLatexEngine {
     }
 
     /**
-     * Detects if content contains mixed narrative text with embedded math delimiters
+     * Formats units for aligned LaTeX array with math mode typography
      */
-    isMixedTextAndMath(text) {
-        if (!text) return false;
-        if (/(?<!\\)\$/.test(text)) return true;
-        if (/^[ \t]*[-*] /m.test(text) && /[\\\{\}\^]/.test(text)) return true;
-        return false;
+    formatLatexUnit(unitStr) {
+        if (!unitStr) return '';
+        let u = unitStr.trim();
+        let hasParens = false;
+        if (u.startsWith('(') && u.endsWith(')')) {
+            hasParens = true;
+            u = u.substring(1, u.length - 1).trim();
+        }
+        u = u.replace(/\$/g, '').trim();
+
+        if (u.includes('\\text')) {
+            return hasParens ? `(${u})` : u;
+        }
+
+        u = u.replace(/\bor\b/g, '\\text{or}');
+
+        const knownLatex = new Set(['cdot', 'circ', 'times', 'prime', 'text', 'partial', 'alpha', 'beta', 'mu', 'sigma', 'omega', 'or']);
+        u = u.replace(/\b([A-Za-z]+)\b/g, (match, word, offset, string) => {
+            if (offset > 0 && string[offset - 1] === '\\') return word;
+            if (knownLatex.has(word)) return word;
+            return `\\text{${word}}`;
+        });
+
+        u = u.replace(/\\text\{or\}/g, '\\text{ or }');
+
+        return hasParens ? `(${u})` : u;
     }
-
-    /**
-     * Compiles mixed text containing embedded math formulas into clean HTML
-     */
-    renderMixedTextAndMath(text) {
-        let processed = text;
-
-        // 1. Block math $$...$$
-        processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
-            const clean = formula.trim();
-            let rendered = '';
-            if (typeof window.katex !== 'undefined' && typeof window.katex.renderToString === 'function') {
-                try {
-                    rendered = window.katex.renderToString(clean, { displayMode: true, throwOnError: false });
-                } catch (e) {
-                    rendered = this.fallbackParseLatex(clean);
-                }
-            } else {
-                rendered = this.fallbackParseLatex(clean);
-            }
-            return `<div class="latex-block-math-wrap" style="text-align:center;margin:8px 0;">${rendered}</div>`;
-        });
-
-        // 2. Inline math $...$
-        processed = processed.replace(/(?<!\$)\$([^\$\r\n]+?)\$(?!\$)/g, (match, formula) => {
-            const clean = formula.trim();
-            let rendered = '';
-            if (typeof window.katex !== 'undefined' && typeof window.katex.renderToString === 'function') {
-                try {
-                    rendered = window.katex.renderToString(clean, { displayMode: false, throwOnError: false });
-                } catch (e) {
-                    rendered = this.fallbackParseLatex(clean);
-                }
-            } else {
-                rendered = this.fallbackParseLatex(clean);
-            }
-            return `<span class="doc-latex-inline is-compiled" data-latex-source="${this.escapeAttribute(clean)}" onclick="window.latexEngine?.openInlineEditor?.(this, event)" title="Click to edit in LaTeX box">${rendered}</span>`;
-        });
-
-        // 3. Inline math \(...\)
-        processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (match, formula) => {
-            const clean = formula.trim();
-            let rendered = '';
-            if (typeof window.katex !== 'undefined' && typeof window.katex.renderToString === 'function') {
-                try {
-                    rendered = window.katex.renderToString(clean, { displayMode: false, throwOnError: false });
-                } catch (e) {
-                    rendered = this.fallbackParseLatex(clean);
-                }
-            } else {
-                rendered = this.fallbackParseLatex(clean);
-            }
-            return `<span class="doc-latex-inline is-compiled" data-latex-source="${this.escapeAttribute(clean)}" onclick="window.latexEngine?.openInlineEditor?.(this, event)" title="Click to edit in LaTeX box">${rendered}</span>`;
-        });
-
-        // 4. Format markdown typography & lists
-        processed = processed
-            .replace(/^###### (.*$)/gim, '<h6>$1</h6>')
-            .replace(/^##### (.*$)/gim, '<h5>$1</h5>')
-            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-            .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-            .replace(/^[ \t]*[-*] (.*$)/gim, '<li>$1</li>')
-            .replace(/\n\n+/gim, '<br><br>')
-            .replace(/\n/gim, '<br>');
-
-        processed = processed.replace(/((?:<li>.*?<\/li>(?:<br\s*\/?>)*)+)/gis, '<ul>$1</ul>');
-        processed = processed.replace(/<ul>(.*?)<\/ul>/gis, (m, inner) => '<ul>' + inner.replace(/<br\s*\/?>/gi, '') + '</ul>');
-
-        return `<div class="latex-mixed-content" style="text-align:left;font-size:0.95em;line-height:1.6;">${processed}</div>`;
-    }
-
-    /**
      * Built-in fallback mathematical parser for offline or non-KaTeX environments
      */
     fallbackParseLatex(code) {
@@ -240,23 +183,6 @@ class SyncPadLatexEngine {
                 return `<tr>${cols}</tr>`;
             }).join('');
             return `<table class="math-matrix-table">${rows}</table>`;
-        });
-
-        // Aligned and Array environments for system equations and variable definitions
-        html = html.replace(/\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}/g, (match, inner) => {
-            const rows = inner.split('\\\\').map(row => {
-                const cols = row.split('&amp;').map(c => `<td class="math-matrix-cell" style="text-align:left;padding:3px 10px;">${this.fallbackParseLatex(c.trim())}</td>`).join('');
-                return `<tr>${cols}</tr>`;
-            }).join('');
-            return `<table class="math-aligned-table">${rows}</table>`;
-        });
-
-        html = html.replace(/\\begin\{array\}(?:\{[^\}]*\})?([\s\S]*?)\\end\{array\}/g, (match, inner) => {
-            const rows = inner.split('\\\\').map(row => {
-                const cols = row.split('&amp;').map(c => `<td class="math-matrix-cell" style="text-align:left;padding:3px 10px;">${this.fallbackParseLatex(c.trim())}</td>`).join('');
-                return `<tr>${cols}</tr>`;
-            }).join('');
-            return `<table class="math-aligned-table">${rows}</table>`;
         });
 
         // Fractions: \frac{num}{den} (supports nested fractions)
@@ -438,20 +364,9 @@ class SyncPadLatexEngine {
                     </div>
 
                     <div class="latex-header-actions">
-                        <button type="button" class="btn-latex-ai" onclick="window.latexEngine.promptAiForEquation()" title="Ask SyncPad AI to generate or fix equation in this box" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7c3aed,#6366f1);color:white;border:none;border-radius:4px;padding:4px 9px;font-size:0.75rem;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(124,58,237,0.3);">
-                            <span style="font-size:11px;">✦</span>
-                            <span>AI Helper</span>
-                        </button>
-                        <button type="button" class="btn-latex-convert" id="btnLatexConvertToCard" onclick="window.latexEngine.convertInlineToCard()" title="Convert this inline equation into a full equation box card" style="display:none;align-items:center;gap:4px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;font-size:0.75rem;font-weight:600;color:#475569;cursor:pointer;">
-                            <span>⤢ Box</span>
-                        </button>
                         <button type="button" class="btn-latex-compile" onclick="window.latexEngine.compileHoverCard()" title="Compile and update equation (Ctrl+Enter)">
                             <i data-lucide="play" style="width: 12px; height: 12px;"></i>
                             <span>Compile</span>
-                        </button>
-                        <button type="button" class="btn-latex-compile-all" onclick="window.latexEngine.compileAllMathInDocument()" title="Scan document and compile all $inline$ and $$block$$ math equations" style="display:inline-flex;align-items:center;gap:3px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:4px;padding:4px 8px;font-size:0.72rem;font-weight:600;color:#7c3aed;cursor:pointer;">
-                            <span style="font-size:11px;">∑</span>
-                            <span>Compile All ($)</span>
                         </button>
                         <button type="button" class="btn-latex-copy" onclick="window.latexEngine.copyHoverSource()" title="Copy LaTeX">
                             <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
@@ -534,11 +449,6 @@ class SyncPadLatexEngine {
         if (!card) return;
 
         this.activeHoverCardId = card.id;
-        this.activeInlineEl = null;
-
-        const convertBtn = document.getElementById('btnLatexConvertToCard');
-        if (convertBtn) convertBtn.style.display = 'none';
-
         const source = card.getAttribute('data-latex-source') || '';
         const currentSize = card.getAttribute('data-latex-size') || '1.2rem';
 
@@ -549,10 +459,9 @@ class SyncPadLatexEngine {
 
         if (input) {
             input.value = source;
-            input.placeholder = "e.g. \\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}";
         }
         if (preview) {
-            preview.innerHTML = this.renderToString(source, true);
+            preview.innerHTML = this.renderToString(source);
             preview.style.fontSize = currentSize;
         }
         if (badge) {
@@ -589,96 +498,6 @@ class SyncPadLatexEngine {
     }
 
     /**
-     * Opens the floating editor anchored to an inline math equation ($...$)
-     */
-    openInlineEditor(inlineEl, event) {
-        if (event) {
-            event.stopPropagation();
-            event.preventDefault();
-        }
-        if (!inlineEl) return;
-
-        this.activeHoverCardId = null;
-        this.activeInlineEl = inlineEl;
-
-        const convertBtn = document.getElementById('btnLatexConvertToCard');
-        if (convertBtn) convertBtn.style.display = 'inline-flex';
-
-        const source = inlineEl.getAttribute('data-latex-source') || inlineEl.textContent.trim();
-        const hoverCard = this.ensureHoverCardElement();
-        const input = document.getElementById('latexHoverSourceInput');
-        const preview = document.getElementById('latexHoverLivePreviewMath');
-        const badge = document.getElementById('latexHoverSizeBadge');
-
-        if (input) {
-            input.value = source;
-            input.placeholder = "e.g. \\nabla^2, \\alpha = \\frac{k}{\\rho c_p}";
-        }
-        if (preview) {
-            preview.innerHTML = this.renderToString(source, false);
-            preview.style.fontSize = '1.15rem';
-        }
-        if (badge) {
-            badge.textContent = 'inline';
-        }
-
-        hoverCard.classList.remove('hidden');
-
-        const rect = inlineEl.getBoundingClientRect();
-        const cardW = 560;
-        const cardH = 260;
-
-        let top = rect.bottom + 10;
-        if (top + cardH > window.innerHeight - 20) {
-            top = Math.max(60, rect.top - cardH - 10);
-        }
-        let left = rect.left + (rect.width / 2) - (cardW / 2);
-        if (left < 16) left = 16;
-        if (left + cardW > window.innerWidth - 16) {
-            left = window.innerWidth - cardW - 16;
-        }
-
-        hoverCard.style.top = `${Math.max(60, top)}px`;
-        hoverCard.style.left = `${Math.max(16, left)}px`;
-
-        if (input) {
-            input.focus();
-            const len = input.value.length;
-            input.setSelectionRange(len, len);
-        }
-
-        if (window.lucide) window.lucide.createIcons();
-    }
-
-    /**
-     * Converts the currently edited inline equation into a full equation card box
-     */
-    convertInlineToCard() {
-        if (!this.activeInlineEl) return;
-        const input = document.getElementById('latexHoverSourceInput');
-        const source = (input ? input.value.trim() : '') || this.activeInlineEl.getAttribute('data-latex-source') || '';
-        if (!source) return;
-
-        const cardHtml = this.generateCardHtml(source);
-        const temp = document.createElement('div');
-        temp.innerHTML = cardHtml;
-        const newCard = temp.firstElementChild;
-
-        const sheet = document.getElementById('docPageSheet') || this.activeInlineEl.parentElement;
-        this.activeInlineEl.replaceWith(newCard);
-        this.activeInlineEl = null;
-
-        if (sheet) {
-            this.initAllCards(sheet);
-        }
-        this.openHoverEditor(newCard.id);
-        if (typeof window.onDocChange === 'function') window.onDocChange();
-        if (typeof window.showToastNotification === 'function') {
-            window.showToastNotification('Converted equation into full LaTeX box!', 'success');
-        }
-    }
-
-    /**
      * Closes the floating hover editor
      */
     closeHoverEditor() {
@@ -687,7 +506,6 @@ class SyncPadLatexEngine {
             hoverCard.classList.add('hidden');
         }
         this.activeHoverCardId = null;
-        this.activeInlineEl = null;
     }
 
     /**
@@ -697,8 +515,7 @@ class SyncPadLatexEngine {
         const input = document.getElementById('latexHoverSourceInput');
         const preview = document.getElementById('latexHoverLivePreviewMath');
         if (input && preview) {
-            const isDisplay = !this.activeInlineEl;
-            preview.innerHTML = this.renderToString(input.value, isDisplay);
+            preview.innerHTML = this.renderToString(input.value);
         }
     }
 
@@ -734,37 +551,6 @@ class SyncPadLatexEngine {
     /**
      * Compiles and applies changes from the hover editor to the target document equation
      */
-    compileHoverCard(keepOpen = false) {
-        const input = document.getElementById('latexHoverSourceInput');
-        if (!input) return;
-        let newSource = input.value.trim();
-
-        // Check if user pasted a bullet list of variable definitions:
-        // auto-convert to aligned system LaTeX so equations and text are formatted in correct positions together!
-        const autoConverted = this.convertBulletMathToAlignedLatex(newSource);
-        if (autoConverted) {
-            newSource = autoConverted;
-            input.value = autoConverted;
-        }
-
-        // 1. Handle Inline equation compilation
-        if (this.activeInlineEl) {
-            this.activeInlineEl.setAttribute('data-latex-source', newSource);
-            this.activeInlineEl.innerHTML = this.renderToString(newSource, false);
-            if (!keepOpen) {
-                this.closeHoverEditor();
-            } else {
-                this.updateHoverPreview();
-            }
-            if (typeof window.onDocChange === 'function') window.onDocChange();
-            if (typeof window.updateDocStats === 'function') window.updateDocStats();
-            if (typeof window.showToastNotification === 'function') {
-                window.showToastNotification('Inline equation compiled successfully!', 'success');
-            }
-            return;
-        }
-
-        // 2. Handle Document Card compilation
         if (!this.activeHoverCardId) return;
         const card = document.getElementById(this.activeHoverCardId);
         if (!card) return;
@@ -781,11 +567,6 @@ class SyncPadLatexEngine {
             renderedWrap.style.fontSize = currentSize;
         }
 
-        if (!keepOpen) {
-            this.closeHoverEditor();
-        } else {
-            this.updateHoverPreview();
-        }
 
         if (typeof window.onDocChange === 'function') {
             window.onDocChange();
@@ -796,124 +577,6 @@ class SyncPadLatexEngine {
         if (typeof window.showToastNotification === 'function') {
             window.showToastNotification('LaTeX equation compiled successfully!', 'success');
         }
-    }
-
-    /**
-     * Triggers SyncPad AI to generate or fix an equation directly inside this LaTeX box
-     */
-    promptAiForEquation() {
-        const input = document.getElementById('latexHoverSourceInput');
-        const currentFormula = input ? input.value.trim() : '';
-        const activeCard = this.activeHoverCardId ? document.getElementById(this.activeHoverCardId) : null;
-
-        window._codeLatexContext = {
-            type: 'latex',
-            selectedText: currentFormula,
-            element: activeCard || this.activeInlineEl,
-            isHoverEditor: true
-        };
-
-        if (typeof window.openAiPalette === 'function') {
-            window.openAiPalette();
-            const aiInput = document.getElementById('aiPromptInput');
-            if (aiInput) {
-                aiInput.placeholder = "Describe equation to generate (e.g. 'Heat equation with variable definitions', 'Euler identity')...";
-            }
-        } else {
-            const userPrompt = window.prompt("Ask SyncPad AI to generate or fix this equation:", currentFormula ? `Refine: ${currentFormula}` : '');
-            if (userPrompt && userPrompt.trim()) {
-                if (typeof window.startAiStreamingWithContext === 'function') {
-                    window.startAiStreamingWithContext('LATEX_GENERATE', userPrompt.trim(), currentFormula, 'latex', currentFormula.length);
-                }
-            }
-        }
-    }
-
-    /**
-     * Scans the document and converts all uncompiled $inline$ and $$display$$ math into interactive KaTeX elements
-     */
-    compileAllMathInDocument(container = document.getElementById('docPageSheet')) {
-        if (!container) return 0;
-
-        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-            acceptNode(node) {
-                if (!node.nodeValue || !node.nodeValue.includes('$')) return NodeFilter.FILTER_REJECT;
-                const parent = node.parentElement;
-                if (!parent) return NodeFilter.FILTER_REJECT;
-                if (parent.closest('.doc-latex-card, .doc-code-card, #latexHoverEditorCard, script, style, pre, code')) {
-                    return NodeFilter.FILTER_REJECT;
-                }
-                return NodeFilter.FILTER_ACCEPT;
-            }
-        });
-
-        const nodesToProcess = [];
-        while (walker.nextNode()) {
-            nodesToProcess.push(walker.currentNode);
-        }
-
-        let count = 0;
-        nodesToProcess.forEach(textNode => {
-            const val = textNode.nodeValue;
-            if (!val || !val.includes('$')) return;
-
-            // 1. Check for block math $$...$$
-            if (/\$\$([\s\S]*?)\$\$/.test(val)) {
-                const frag = document.createDocumentFragment();
-                const parts = val.split(/(\$\$[\s\S]*?\$\$)/g);
-                parts.forEach(part => {
-                    const blockMatch = part.match(/^\$\$([\s\S]*?)\$\$$/);
-                    if (blockMatch) {
-                        const formula = blockMatch[1].trim();
-                        const cardHtml = this.generateCardHtml(formula);
-                        const temp = document.createElement('div');
-                        temp.innerHTML = cardHtml;
-                        frag.appendChild(temp.firstElementChild);
-                        count++;
-                    } else if (part) {
-                        frag.appendChild(document.createTextNode(part));
-                    }
-                });
-                textNode.replaceWith(frag);
-                return;
-            }
-
-            // 2. Check for inline math $(...)$ or $...$
-            if (/(?<!\$)\$([^\$\r\n]+?)\$(?!\$)/.test(val)) {
-                const frag = document.createDocumentFragment();
-                const parts = val.split(/((?<!\$)\$[^\$\r\n]+?\$(?!\$))/g);
-                parts.forEach(part => {
-                    const inlineMatch = part.match(/^(\$)([^\$\r\n]+?)\$$/);
-                    if (inlineMatch) {
-                        const formula = inlineMatch[2].trim();
-                        const span = document.createElement('span');
-                        span.className = 'doc-latex-inline is-compiled';
-                        span.setAttribute('data-latex-source', formula);
-                        span.setAttribute('title', 'Click to edit in LaTeX box');
-                        span.innerHTML = this.renderToString(formula, false);
-                        span.onclick = (e) => this.openInlineEditor(span, e);
-                        frag.appendChild(span);
-                        count++;
-                    } else if (part) {
-                        frag.appendChild(document.createTextNode(part));
-                    }
-                });
-                textNode.replaceWith(frag);
-            }
-        });
-
-        this.initAllCards(container);
-        if (count > 0) {
-            if (typeof window.onDocChange === 'function') window.onDocChange();
-            if (typeof window.showToastNotification === 'function') {
-                window.showToastNotification(`Compiled ${count} math formula${count > 1 ? 's' : ''} in document!`, 'success');
-            }
-        } else {
-            if (typeof window.showToastNotification === 'function') {
-                window.showToastNotification('All math formulas in document are already compiled!', 'info');
-            }
-        }
-        return count;
     }
 
     /**
@@ -980,18 +643,6 @@ class SyncPadLatexEngine {
 
             this.setupCardDragAndDrop(card);
             this.setupCardResizer(card);
-        });
-
-        const inlines = container.querySelectorAll('.doc-latex-inline');
-        inlines.forEach(inline => {
-            const src = inline.getAttribute('data-latex-source');
-            if (src && !inline.querySelector('.katex')) {
-                inline.innerHTML = this.renderToString(src, false);
-            }
-            if (!inline._hasLatexClick) {
-                inline._hasLatexClick = true;
-                inline.onclick = (e) => this.openInlineEditor(inline, e);
-            }
         });
     }
 
