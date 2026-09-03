@@ -42,6 +42,8 @@
     
     <!-- SyncPad AI Document Assistant & Gemini Copilot -->
     <script src="js/ai/ai-assistant.js"></script>
+    <script src="js/ai/ghost-autocomplete.js"></script>
+    <script src="js/ai/code-latex-ai.js"></script>
 
     <!-- SyncPad Character-Level CRDT Collaboration Engine -->
     <script src="js/crdt/syncpad-crdt.js"></script>
@@ -667,16 +669,6 @@
                                 <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i>
                                 <span id="docSaveText">Saved</span>
                             </span>
-
-                            <!-- PWA Network status badge (Online / Offline) -->
-                            <span id="networkStatusBadge" class="network-badge online" title="Connection Status" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 500; padding: 2px 8px; border-radius: 9999px; background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.2); cursor: default; white-space: nowrap;">
-                                <span class="status-dot online" style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> Online
-                            </span>
-
-                            <!-- PWA Install Button (hidden until prompt is available) -->
-                            <button id="pwaInstallBtn" class="btn btn-outline btn-xs" onclick="triggerPwaInstall()" title="Install SyncPad App" style="display:none; align-items: center; gap: 4px; border-color: #4f46e5; color: #4f46e5; padding: 2px 8px; font-size: 0.72rem; border-radius: 9999px;">
-                                <i data-lucide="download" style="width:11px;height:11px;"></i> Install App
-                            </button>
                         </div>
 
                         <!-- Right Actions -->
@@ -768,9 +760,6 @@
                                 </div>
                             </div>
 
-                            <!-- Offline / Online Status Badge -->
-                            <span id="offlineStatusBadge" class="badge" style="font-size: 0.72rem; display: flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.2rem 0.5rem;"><span style="width:6px;height:6px;border-radius:50%;background:#10b981;"></span> Online</span>
-
                             <!-- Share Button -->
                             <button class="btn btn-primary" onclick="openDocShareModal()" style="height: 30px; padding: 0.3rem 0.65rem; font-size: 0.78rem; flex-shrink: 0;" title="Collaborator Permissions & Share Links">
                                 <i data-lucide="share-2" style="width:14px;height:14px;"></i>
@@ -804,6 +793,7 @@
                                 <button class="doc-menu-item" onclick="selectTextStyle('code', 'Code Block')"><span style="font-family: monospace; background: var(--bg-hover); padding: 1px 4px; border-radius: 3px;">Code block</span></button>
                                 <button class="doc-menu-item" onclick="selectTextStyle('callout', 'Callout')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="info" style="width:14px;height:14px;color:var(--accent-primary);"></i> Callout box</span></button>
                                 <button class="doc-menu-item" onclick="selectTextStyle('latex', 'LaTeX Equation')"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-family: 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">L<sup>A</sup>T<sub>E</sub>X</span> LaTeX style</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘M</span></button>
+                                <button class="doc-menu-item" onclick="if(window.latexEngine)window.latexEngine.compileAllMathInDocument();const m=document.getElementById('styleDropdownMenu');if(m)m.classList.add('hidden');" title="Scan and compile all $inline$ and $$block$$ math equations in document"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">∑</span> Format All Math ($)</span></button>
                             </div>
                         </div>
 
@@ -884,21 +874,42 @@
                                     <span style="font-size: 0.85rem; font-weight: 800;">A</span>
                                     <span id="textColorIndicator" style="width: 14px; height: 3px; background: var(--text-primary); border-radius: 1px;"></span>
                                 </button>
-                                <div id="textColorPicker" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 185px;">
-                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem;">Text Color</div>
+                                <div id="textColorPicker" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 220px; max-height: 320px; overflow-y: auto;">
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem;">Solid Colors</div>
                                     <div class="color-swatch-grid">
-                                        <button class="color-swatch-btn" style="background: #0f172a;" onclick="applyColor('text', '#0f172a')"></button>
-                                        <button class="color-swatch-btn" style="background: #475569;" onclick="applyColor('text', '#475569')"></button>
-                                        <button class="color-swatch-btn" style="background: #2563eb;" onclick="applyColor('text', '#2563eb')"></button>
-                                        <button class="color-swatch-btn" style="background: #7c3aed;" onclick="applyColor('text', '#7c3aed')"></button>
-                                        <button class="color-swatch-btn" style="background: #db2777;" onclick="applyColor('text', '#db2777')"></button>
-                                        <button class="color-swatch-btn" style="background: #dc2626;" onclick="applyColor('text', '#dc2626')"></button>
-                                        <button class="color-swatch-btn" style="background: #d97706;" onclick="applyColor('text', '#d97706')"></button>
-                                        <button class="color-swatch-btn" style="background: #059669;" onclick="applyColor('text', '#059669')"></button>
-                                        <button class="color-swatch-btn" style="background: #0891b2;" onclick="applyColor('text', '#0891b2')"></button>
-                                        <button class="color-swatch-btn" style="background: #4f46e5;" onclick="applyColor('text', '#4f46e5')"></button>
-                                        <button class="color-swatch-btn" style="background: #9333ea;" onclick="applyColor('text', '#9333ea')"></button>
-                                        <button class="color-swatch-btn" style="background: #64748b;" onclick="applyColor('text', '#64748b')"></button>
+                                        <button class="color-swatch-btn" style="background: #0f172a;" onclick="applyColor('text', '#0f172a')" title="Black"></button>
+                                        <button class="color-swatch-btn" style="background: #475569;" onclick="applyColor('text', '#475569')" title="Slate"></button>
+                                        <button class="color-swatch-btn" style="background: #2563eb;" onclick="applyColor('text', '#2563eb')" title="Blue"></button>
+                                        <button class="color-swatch-btn" style="background: #7c3aed;" onclick="applyColor('text', '#7c3aed')" title="Violet"></button>
+                                        <button class="color-swatch-btn" style="background: #db2777;" onclick="applyColor('text', '#db2777')" title="Pink"></button>
+                                        <button class="color-swatch-btn" style="background: #dc2626;" onclick="applyColor('text', '#dc2626')" title="Red"></button>
+                                        <button class="color-swatch-btn" style="background: #d97706;" onclick="applyColor('text', '#d97706')" title="Amber"></button>
+                                        <button class="color-swatch-btn" style="background: #059669;" onclick="applyColor('text', '#059669')" title="Emerald"></button>
+                                        <button class="color-swatch-btn" style="background: #0891b2;" onclick="applyColor('text', '#0891b2')" title="Cyan"></button>
+                                        <button class="color-swatch-btn" style="background: #4f46e5;" onclick="applyColor('text', '#4f46e5')" title="Indigo"></button>
+                                        <button class="color-swatch-btn" style="background: #9333ea;" onclick="applyColor('text', '#9333ea')" title="Purple"></button>
+                                        <button class="color-swatch-btn" style="background: #64748b;" onclick="applyColor('text', '#64748b')" title="Gray"></button>
+                                    </div>
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.6rem 0.4rem 0.2rem; border-top: 1px solid var(--border-color); margin-top: 0.5rem;">Gradients</div>
+                                    <div class="color-swatch-grid">
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff7e5f, #feb47b);" onclick="applyColor('text', 'linear-gradient(90deg, #ff7e5f, #feb47b)')" title="Sunset"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #2193b0, #6dd5ed);" onclick="applyColor('text', 'linear-gradient(90deg, #2193b0, #6dd5ed)')" title="Ocean"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #11998e, #38ef7d);" onclick="applyColor('text', 'linear-gradient(90deg, #11998e, #38ef7d)')" title="Forest"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #8e2de2, #4a00e0);" onclick="applyColor('text', 'linear-gradient(90deg, #8e2de2, #4a00e0)')" title="Purple Dream"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #f12711, #f5af19);" onclick="applyColor('text', 'linear-gradient(90deg, #f12711, #f5af19)')" title="Fire"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #00c9ff, #92fe9d);" onclick="applyColor('text', 'linear-gradient(90deg, #00c9ff, #92fe9d)')" title="Aurora"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #e84393, #e77f67);" onclick="applyColor('text', 'linear-gradient(90deg, #e84393, #e77f67)')" title="Rose"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #4b6cb7, #182848);" onclick="applyColor('text', 'linear-gradient(90deg, #4b6cb7, #182848)')" title="Midnight"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff9a9e, #fecfef, #fecfef);" onclick="applyColor('text', 'linear-gradient(90deg, #ff9a9e, #fecfef)')" title="Blush"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #a1c4fd, #c2e9fb);" onclick="applyColor('text', 'linear-gradient(90deg, #a1c4fd, #c2e9fb)')" title="Sky"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #f6d365, #fda085);" onclick="applyColor('text', 'linear-gradient(90deg, #f6d365, #fda085)')" title="Peach"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff8177, #ff867a, #ff8c7f);" onclick="applyColor('text', 'linear-gradient(90deg, #ff8177, #ff867a)')" title="Coral"></button>
+                                    </div>
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.6rem 0.4rem 0.2rem; border-top: 1px solid var(--border-color); margin-top: 0.5rem;">Custom (any hex)</div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem;">
+                                        <input type="color" id="customTextColorInput" value="#2563eb" style="width: 44px; height: 32px; padding: 2px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; background: var(--bg-surface);" title="Pick any color">
+                                        <input type="text" id="customTextColorHex" placeholder="#2563eb" value="#2563eb" maxlength="7" style="flex: 1; height: 32px; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; padding: 0 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface); color: var(--text-primary);" title="Hex color">
+                                        <button class="btn btn-primary" style="height: 32px; padding: 0 0.75rem; font-size: 0.75rem; font-weight: 600;" onclick="applyCustomTextColor()" title="Apply custom color">Apply</button>
                                     </div>
                                 </div>
                             </div>
@@ -1004,38 +1015,18 @@
                         <!-- A. DOCUMENT OUTLINE LEFT DRAWER (COLLAPSIBLE) -->
                         <div id="docOutlineDrawer" class="doc-outline-drawer hidden">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
-                                <span style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Document Outline</span>
-                                <button class="btn btn-icon" onclick="toggleDocOutline()" style="width: 24px; height: 24px;"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <i data-lucide="list-tree" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                                    <span style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Outline</span>
+                                    <span id="docOutlineCountBadge" style="font-size: 0.65rem; background: var(--bg-hover); color: var(--text-muted); padding: 1px 6px; border-radius: 9999px;">0</span>
+                                </div>
+                                <button class="btn btn-icon" onclick="toggleDocOutline()" style="width: 24px; height: 24px;" title="Collapse Outline"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                <a href="#sec-overview" class="doc-outline-item active">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-primary);"></span>
-                                    <span>1. System Overview & Core Stack</span>
-                                </a>
-                                <a href="#sec-realtime" class="doc-outline-item">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong);"></span>
-                                    <span>2. Real-Time Synchronization Protocol</span>
-                                </a>
-                                <a href="#sec-websocket" class="doc-outline-item" style="padding-left: 1.5rem; font-size: 0.75rem;">
-                                    <span>2.1 WebSocket & STOMP Broker</span>
-                                </a>
-                                <a href="#sec-ot" class="doc-outline-item" style="padding-left: 1.5rem; font-size: 0.75rem;">
-                                    <span>2.2 Operational Transformation (OT)</span>
-                                </a>
-                                <a href="#sec-database" class="doc-outline-item">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong);"></span>
-                                    <span>3. Persistence & Relational Schema</span>
-                                </a>
-                                <a href="#sec-security" class="doc-outline-item">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong);"></span>
-                                    <span>4. Security & Role-Based Access</span>
-                                </a>
-                                <a href="#sec-deployment" class="doc-outline-item">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong);"></span>
-                                    <span>5. High-Availability & Deployment</span>
-                                </a>
+                            <div id="docOutlineList" style="display: flex; flex-direction: column; gap: 0.2rem; overflow-y: auto; flex: 1;">
+                                <!-- Headings rendered dynamically -->
                             </div>
                         </div>
+
 
                         <!-- B. PDF REFERENCE PANEL (SPLIT WORKSPACE) -->
                         <div id="pdfReferencePane" class="doc-pdf-pane">
@@ -1121,7 +1112,7 @@
                                     <button class="btn btn-icon" onclick="zoomPdf(-10)" title="Zoom Out"><i data-lucide="minus" style="width:14px;height:14px;"></i></button>
                                     <span id="pdfZoomLevel" style="font-size: 0.75rem; font-weight: 600; min-width: 40px; text-align: center;">125%</span>
                                     <button class="btn btn-icon" onclick="zoomPdf(10)" title="Zoom In"><i data-lucide="plus" style="width:14px;height:14px;"></i></button>
-                                    <button class="btn btn-icon" onclick="resetPdfZoom()" title="Reset Zoom (100%)"><i data-lucide="maximize" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" onclick="resetPdfZoom()" title="Reset Zoom (100%)"><i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i></button>
                                 </div>
 
                                 <!-- Actions -->
@@ -1129,6 +1120,7 @@
                                     <button class="btn btn-icon" onclick="copyAllPdfText()" title="Copy All Text on Page"><i data-lucide="copy" style="width:14px;height:14px;"></i></button>
                                     <button class="btn btn-icon" onclick="togglePdfSearch()" title="Search in PDF"><i data-lucide="search" style="width:14px;height:14px;"></i></button>
                                     <button class="btn btn-icon" onclick="downloadCurrentPdf()" title="Download PDF"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" id="pdfFullscreenBtn" onclick="togglePdfFullscreen()" title="Full Screen (Maximize PDF)"><i data-lucide="maximize-2" id="pdfFullscreenIcon" style="width:14px;height:14px;"></i></button>
                                     <button class="btn btn-icon" onclick="togglePdfPanel()" title="Close PDF Reference Pane"><i data-lucide="x" style="width:15px;height:15px;"></i></button>
                                 </div>
 
@@ -2613,28 +2605,58 @@
                 </div>
                 <div style="display: flex; gap: 1.5rem;">
                     <div style="width: 140px; display: flex; flex-direction: column; gap: 0.25rem;">
-                        <a href="#" class="sidebar-item active">Profile</a>
-                        <a href="#" class="sidebar-item">Appearance</a>
-                        <a href="#" class="sidebar-item">Notifications</a>
-                        <a href="#" class="sidebar-item">Security</a>
+                        <a href="#" class="sidebar-item active" onclick="switchSettingsTab('profile', this)">Profile</a>
+                        <a href="#" class="sidebar-item" onclick="switchSettingsTab('ai', this)">AI & Ghost</a>
+                        <a href="#" class="sidebar-item" onclick="switchSettingsTab('appearance', this)">Appearance</a>
+                        <a href="#" class="sidebar-item" onclick="switchSettingsTab('notifications', this)">Notifications</a>
+                        <a href="#" class="sidebar-item" onclick="switchSettingsTab('security', this)">Security</a>
                     </div>
                     <div style="flex: 1; border-left: 1px solid var(--border-color); padding-left: 1.5rem;">
-                        <h3 style="font-size: 1rem; margin-bottom: 1rem;">Profile Information</h3>
-                        <div class="input-group">
-                            <label class="input-label">Full Name</label>
-                            <input type="text" id="settingsNameInput" class="input" value="Alex Morgan">
+                        <div id="settingsTab-profile">
+                            <h3 style="font-size: 1rem; margin-bottom: 1rem;">Profile Information</h3>
+                            <div class="input-group">
+                                <label class="input-label">Full Name</label>
+                                <input type="text" id="settingsNameInput" class="input" value="Alex Morgan">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Email Address</label>
+                                <input type="email" id="settingsEmailInput" class="input" value="alex@company.com" readonly>
+                            </div>
+                            <div style="margin-top: 1.5rem;">
+                                <label class="input-label">Theme Preference</label>
+                                <div style="display: flex; gap: 0.75rem; margin-top: 0.4rem;">
+                                    <button class="btn btn-outline" onclick="setTheme('light')">Light Theme</button>
+                                    <button class="btn btn-outline" onclick="setTheme('dark')">Dark Theme</button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label class="input-label">Email Address</label>
-                            <input type="email" id="settingsEmailInput" class="input" value="alex@company.com" readonly>
+                        <div id="settingsTab-ai" class="hidden">
+                            <h3 style="font-size: 1rem; margin-bottom: 0.75rem; display:flex; align-items:center; gap:0.5rem;"><i data-lucide="sparkles" style="width:16px;height:16px;color:#7c3aed;"></i> AI Features</h3>
+                            <div style="background: var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.85rem;">
+                                <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+                                    <div>
+                                        <div style="font-weight:600; font-size:0.88rem;">Ghost Autocomplete</div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Tab to accept next sentence as you type (debounce 800ms)</div>
+                                    </div>
+                                    <div style="position:relative; width:44px; height:24px; flex-shrink:0;">
+                                        <input type="checkbox" id="ghostToggle" onchange="toggleGhostAutocomplete(this.checked)" style="opacity:0; width:0; height:0;">
+                                        <span id="ghostToggleSlider" style="position:absolute; inset:0; background:#cbd5e1; border-radius:9999px; transition:.2s; cursor:pointer;"></span>
+                                        <span id="ghostToggleKnob" style="position:absolute; top:2px; left:2px; width:20px; height:20px; background:white; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2);"></span>
+                                    </div>
+                                </label>
+                                <div id="ghostStatusText" style="font-size:0.72rem; color:var(--text-muted); background:var(--bg-surface); border:1px dashed var(--border-color); border-radius:6px; padding:0.5rem 0.6rem;">Ghost is <strong id="ghostStatusLabel">OFF</strong> — enable to get inline Tab completions from EXPAND.</div>
+                            </div>
+                            <p style="font-size:0.72rem; color:var(--text-muted); margin-top:0.6rem;">Uses <code>POST /api/ai/stream EXPAND</code> with 500 chars before caret. Press <kbd>Tab</kbd> to accept, <kbd>Esc</kbd> to dismiss.</p>
                         </div>
-                        <div style="margin-top: 1.5rem;">
-                            <label class="input-label">Theme Preference</label>
+                        <div id="settingsTab-appearance" class="hidden">
+                            <h3 style="font-size: 1rem; margin-bottom: 1rem;">Appearance</h3>
                             <div style="display: flex; gap: 0.75rem; margin-top: 0.4rem;">
                                 <button class="btn btn-outline" onclick="setTheme('light')">Light Theme</button>
                                 <button class="btn btn-outline" onclick="setTheme('dark')">Dark Theme</button>
                             </div>
                         </div>
+                        <div id="settingsTab-notifications" class="hidden"><h3 style="font-size:1rem;">Notifications</h3><p style="font-size:0.85rem; color:var(--text-muted);">Manage email and in-app alerts.</p></div>
+                        <div id="settingsTab-security" class="hidden"><h3 style="font-size:1rem;">Security</h3><p style="font-size:0.85rem; color:var(--text-muted);">Password, sessions, and 2FA.</p></div>
                     </div>
                 </div>
             </div>
@@ -2780,6 +2802,24 @@
             container.appendChild(toastEl);
             refreshIcons();
             setTimeout(() => toastEl.remove(), 3500);
+        }
+
+        // AUTHENTICATED FETCH HELPER
+        async function fetchWithAuth(url, options = {}) {
+            const headers = Object.assign({}, options.headers || {});
+            if (token && !headers['Authorization']) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+                options.body = JSON.stringify(options.body);
+                if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+            }
+            options.headers = headers;
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                logout();
+            }
+            return res;
         }
 
         // AUTHENTICATION
@@ -2996,6 +3036,22 @@
             loadWorkspaceContents();
             renderHomeScreen();
             renderSharedWithMeScreen();
+            loadStarredCount();
+        }
+
+        async function loadStarredCount() {
+            try {
+                const res = await fetchWithAuth('/documents/starred');
+                if (res.ok) {
+                    const starred = await res.json() || [];
+                    rawStarredDocuments = starred;
+                    const sideBadge = document.getElementById('sidebarStarredCount');
+                    if (sideBadge) {
+                        sideBadge.innerText = starred.length;
+                        sideBadge.style.display = starred.length > 0 ? 'inline-block' : 'none';
+                    }
+                }
+            } catch (e) {}
         }
 
         function renderWorkspaceMenu() {
@@ -3716,7 +3772,10 @@
                             toast(`Trash emptied (${data.count || 0} item(s) purged)`);
                             selectedTrashIds.clear();
                             await loadAndRenderTrash();
-                            await fetchWorkspaceData();
+                            await loadWorkspaceContents();
+                    try { await loadUserWorkspaces(); } catch(e) {}
+                    renderDashboardGrids();
+                    renderHomeScreen();
                         } else {
                             toast('Failed to empty trash');
                         }
@@ -3747,7 +3806,10 @@
                             toast(`Restored ${data.count || ids.length} document(s) successfully`);
                             selectedTrashIds.clear();
                             await loadAndRenderTrash();
-                            await fetchWorkspaceData();
+                            await loadWorkspaceContents();
+                    try { await loadUserWorkspaces(); } catch(e) {}
+                    renderDashboardGrids();
+                    renderHomeScreen();
                         } else {
                             toast('Failed to restore all items');
                         }
@@ -3773,7 +3835,10 @@
                         toast(`Restored ${data.count || ids.length} selected document(s)`);
                         selectedTrashIds.clear();
                         await loadAndRenderTrash();
-                        await fetchWorkspaceData();
+                        await loadWorkspaceContents();
+                    try { await loadUserWorkspaces(); } catch(e) {}
+                    renderDashboardGrids();
+                    renderHomeScreen();
                     } else {
                         toast('Failed to restore selected documents');
                     }
@@ -3820,7 +3885,10 @@
                     toast('Document restored successfully');
                     selectedTrashIds.delete(docId);
                     await loadAndRenderTrash();
-                    await fetchWorkspaceData();
+                    await loadWorkspaceContents();
+                    try { await loadUserWorkspaces(); } catch(e) {}
+                    renderDashboardGrids();
+                    renderHomeScreen();
                 } else {
                     toast('Failed to restore document');
                 }
@@ -3969,8 +4037,14 @@
         async function toggleStarDoc(docId) {
             try {
                 let isCurrentlyStarred = false;
-                let target = (documentsList && documentsList.find(d => d.id === docId)) || (rawStarredDocuments && rawStarredDocuments.find(d => d.id === docId));
-                if (target) isCurrentlyStarred = !!target.isStarred;
+                let target = (documentsList && documentsList.find(d => d.id === docId)) ||
+                             (folderDocumentsList && folderDocumentsList.find(d => d.id === docId)) ||
+                             (rawStarredDocuments && rawStarredDocuments.find(d => d.id === docId));
+                if (target) {
+                    isCurrentlyStarred = !!target.isStarred;
+                } else if (currentDoc && currentDoc.id === docId) {
+                    isCurrentlyStarred = !!currentDoc.isStarred;
+                }
 
                 const method = isCurrentlyStarred ? 'DELETE' : 'POST';
                 const res = await fetchWithAuth(`/documents/${docId}/star`, { method });
@@ -3986,13 +4060,40 @@
                     const dIdx = documentsList.findIndex(d => d.id === docId);
                     if (dIdx !== -1) documentsList[dIdx].isStarred = updated.isStarred;
                 }
+                if (folderDocumentsList) {
+                    const fIdx = folderDocumentsList.findIndex(d => d.id === docId);
+                    if (fIdx !== -1) folderDocumentsList[fIdx].isStarred = updated.isStarred;
+                }
+                if (rawStarredDocuments) {
+                    const sIdx = rawStarredDocuments.findIndex(d => d.id === docId);
+                    if (sIdx !== -1) {
+                        if (!updated.isStarred) {
+                            rawStarredDocuments.splice(sIdx, 1);
+                        } else {
+                            rawStarredDocuments[sIdx].isStarred = true;
+                        }
+                    } else if (updated.isStarred) {
+                        rawStarredDocuments.unshift(updated);
+                    }
+                }
                 if (currentDoc && currentDoc.id === docId) {
                     currentDoc.isStarred = updated.isStarred;
                     updateEditorStarIcon(updated.isStarred);
                 }
 
+                // Update sidebar badge
+                const sideBadge = document.getElementById('sidebarStarredCount');
+                if (sideBadge) {
+                    const count = rawStarredDocuments ? rawStarredDocuments.length : (documentsList ? documentsList.filter(d => d.isStarred).length : 0);
+                    sideBadge.innerText = count;
+                    sideBadge.style.display = count > 0 ? 'inline-block' : 'none';
+                }
+
                 renderDashboardGrids();
-                if (previousView === 'starred') {
+                if (activeFolder) {
+                    renderFolderFiles();
+                }
+                if (previousView === 'starred' || !document.getElementById('starredView').classList.contains('hidden')) {
                     await loadAndRenderStarred();
                 }
                 refreshIcons();
@@ -4141,15 +4242,25 @@
                     const dIdx = documentsList.findIndex(d => d.id === currentTagDocId);
                     if (dIdx !== -1) documentsList[dIdx].tags = updated.tags;
                 }
+                if (folderDocumentsList) {
+                    const fIdx = folderDocumentsList.findIndex(d => d.id === currentTagDocId);
+                    if (fIdx !== -1) folderDocumentsList[fIdx].tags = updated.tags;
+                }
                 if (rawStarredDocuments) {
                     const sIdx = rawStarredDocuments.findIndex(d => d.id === currentTagDocId);
                     if (sIdx !== -1) rawStarredDocuments[sIdx].tags = updated.tags;
+                }
+                if (currentDoc && currentDoc.id === currentTagDocId) {
+                    currentDoc.tags = updated.tags;
                 }
                 if (currentTagDoc) currentTagDoc.tags = updated.tags;
 
                 await renderTagModalContent();
                 renderDashboardGrids();
-                if (previousView === 'starred') renderFilteredStarred();
+                if (activeFolder) renderFolderFiles();
+                if (previousView === 'starred' || !document.getElementById('starredView').classList.contains('hidden')) {
+                    renderFilteredStarred();
+                }
             } catch (e) {
                 toast('Error adding tag');
             }
@@ -4173,15 +4284,25 @@
                     const dIdx = documentsList.findIndex(d => d.id === currentTagDocId);
                     if (dIdx !== -1) documentsList[dIdx].tags = updated.tags;
                 }
+                if (folderDocumentsList) {
+                    const fIdx = folderDocumentsList.findIndex(d => d.id === currentTagDocId);
+                    if (fIdx !== -1) folderDocumentsList[fIdx].tags = updated.tags;
+                }
                 if (rawStarredDocuments) {
                     const sIdx = rawStarredDocuments.findIndex(d => d.id === currentTagDocId);
                     if (sIdx !== -1) rawStarredDocuments[sIdx].tags = updated.tags;
+                }
+                if (currentDoc && currentDoc.id === currentTagDocId) {
+                    currentDoc.tags = updated.tags;
                 }
                 if (currentTagDoc) currentTagDoc.tags = updated.tags;
 
                 await renderTagModalContent();
                 renderDashboardGrids();
-                if (previousView === 'starred') renderFilteredStarred();
+                if (activeFolder) renderFolderFiles();
+                if (previousView === 'starred' || !document.getElementById('starredView').classList.contains('hidden')) {
+                    renderFilteredStarred();
+                }
             } catch (e) {
                 toast('Error attaching tag');
             }
@@ -4205,15 +4326,25 @@
                     const dIdx = documentsList.findIndex(d => d.id === currentTagDocId);
                     if (dIdx !== -1) documentsList[dIdx].tags = updated.tags;
                 }
+                if (folderDocumentsList && updated) {
+                    const fIdx = folderDocumentsList.findIndex(d => d.id === currentTagDocId);
+                    if (fIdx !== -1) folderDocumentsList[fIdx].tags = updated.tags;
+                }
                 if (rawStarredDocuments && updated) {
                     const sIdx = rawStarredDocuments.findIndex(d => d.id === currentTagDocId);
                     if (sIdx !== -1) rawStarredDocuments[sIdx].tags = updated.tags;
+                }
+                if (currentDoc && currentDoc.id === currentTagDocId && updated) {
+                    currentDoc.tags = updated.tags;
                 }
                 if (currentTagDoc && updated) currentTagDoc.tags = updated.tags;
 
                 await renderTagModalContent();
                 renderDashboardGrids();
-                if (previousView === 'starred') renderFilteredStarred();
+                if (activeFolder) renderFolderFiles();
+                if (previousView === 'starred' || !document.getElementById('starredView').classList.contains('hidden')) {
+                    renderFilteredStarred();
+                }
             } catch (e) {
                 toast('Error removing tag');
             }
@@ -5013,17 +5144,47 @@
                 }
             } else if (renameTarget.type === 'doc') {
                 try {
-                    await fetch(`/documents/${renameTarget.id}`, {
+                    const res = await fetchWithAuth(`/documents/${renameTarget.id}/rename`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: newName })
                     });
-                } catch (err) {}
-                const d = documentsList.find(item => item.id === renameTarget.id);
-                if (d) d.title = newName;
-                const fd = folderDocumentsList.find(item => item.id === renameTarget.id);
-                if (fd) fd.title = newName;
-                if (activeFolder) renderFolderFiles();
+                    if (res && res.ok) {
+                        const updated = await res.json();
+                        const d = documentsList.find(item => item.id === renameTarget.id);
+                        if (d) Object.assign(d, updated);
+                        const fd = folderDocumentsList.find(item => item.id === renameTarget.id);
+                        if (fd) Object.assign(fd, updated);
+                        const sd = rawStarredDocuments.find(item => item.id === renameTarget.id);
+                        if (sd) Object.assign(sd, updated);
+                        if (currentDoc && currentDoc.id === renameTarget.id) {
+                            Object.assign(currentDoc, updated);
+                            const titleInput = document.getElementById('docTitleInput');
+                            if (titleInput) titleInput.value = updated.title || newName;
+                            const bc = document.getElementById('docTitleBreadcrumb');
+                            if (bc) bc.innerText = updated.title || newName;
+                            const wsTitle = document.getElementById('docWorkspaceTitle');
+                            if (wsTitle && updated.title) wsTitle.innerText = updated.title;
+                        }
+                        if (activeFolder) renderFolderFiles();
+                    } else {
+                        const d = documentsList.find(item => item.id === renameTarget.id);
+                        if (d) d.title = newName;
+                        const fd = folderDocumentsList.find(item => item.id === renameTarget.id);
+                        if (fd) fd.title = newName;
+                        if (currentDoc && currentDoc.id === renameTarget.id) {
+                            currentDoc.title = newName;
+                            const ti = document.getElementById('docTitleInput');
+                            if (ti) ti.value = newName;
+                        }
+                    }
+                } catch (err) {
+                    const d = documentsList.find(item => item.id === renameTarget.id);
+                    if (d) d.title = newName;
+                    const fd = folderDocumentsList.find(item => item.id === renameTarget.id);
+                    if (fd) fd.title = newName;
+                    if (currentDoc && currentDoc.id === renameTarget.id) currentDoc.title = newName;
+                }
             }
 
             renderDashboardGrids();
@@ -5488,10 +5649,14 @@
                     }
                     refreshIcons();
                     updateDocStats();
+                    if (typeof updateDocOutline === 'function') {
+                        updateDocOutline();
+                    }
                     if (typeof loadDocAnnotationsFromStorage === 'function') {
                         loadDocAnnotationsFromStorage(item.id);
                     }
                 }
+
 
                 // PDF Attachment metadata & dynamic loader
                 const pdfName = item.pdfFileName || 'RFC-7629-Architecture.pdf';
@@ -6419,13 +6584,241 @@
             URL.revokeObjectURL(url);
         }
 
+        // =========================================================================
+        // DYNAMIC DOCUMENT OUTLINE & HEADING NAVIGATION SYSTEM
+        // =========================================================================
+        let docOutlineDebounceTimer = null;
+        let docOutlineScrollSpyAttached = false;
+        let activeOutlineHeadingId = null;
+
         function toggleDocOutline() {
             const outline = document.getElementById('docOutlineDrawer');
-            if (outline) outline.classList.toggle('hidden');
+            if (!outline) return;
+            const isOpening = outline.classList.contains('hidden');
+            outline.classList.toggle('hidden');
             const btn = document.getElementById('docOutlineBtn');
-            if (btn) btn.classList.toggle('active');
+            if (btn) btn.classList.toggle('active', isOpening);
+            if (isOpening) {
+                updateDocOutline();
+                initDocOutlineScrollSpy();
+            }
             refreshIcons();
         }
+
+        function triggerDocOutlineUpdate(debounceMs = 300) {
+            if (docOutlineDebounceTimer) clearTimeout(docOutlineDebounceTimer);
+            docOutlineDebounceTimer = setTimeout(() => {
+                const outline = document.getElementById('docOutlineDrawer');
+                // Always update if drawer is open or exists
+                if (outline && !outline.classList.contains('hidden')) {
+                    updateDocOutline();
+                }
+            }, debounceMs);
+        }
+
+        function updateDocOutline() {
+            const list = document.getElementById('docOutlineList');
+            const countBadge = document.getElementById('docOutlineCountBadge');
+            if (!list) return;
+
+            const sheet = document.getElementById('docPageSheet');
+            if (!sheet) {
+                list.innerHTML = `
+                    <div class="doc-outline-empty">
+                        <div class="doc-outline-empty-icon"><i data-lucide="file-text" style="width:16px;height:16px;"></i></div>
+                        <span style="font-size:0.75rem;">No active document loaded.</span>
+                    </div>`;
+                if (countBadge) countBadge.textContent = '0';
+                refreshIcons();
+                return;
+            }
+
+            const titleInput = document.getElementById('docTitleInput');
+            const docTitle = (titleInput ? titleInput.value.trim() : '') || (currentDoc ? currentDoc.title : '') || 'Untitled Document';
+
+            const headings = Array.from(sheet.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+            if (countBadge) countBadge.textContent = String(headings.length);
+
+            let html = '';
+
+            // 1. Root Document Title Item
+            html += `
+                <div class="doc-outline-item doc-outline-title ${!activeOutlineHeadingId ? 'active' : ''}" onclick="scrollToDocTop()" title="Jump to Document Title">
+                    <span class="doc-outline-dot" style="background: var(--accent-primary);"></span>
+                    <span class="truncate" style="font-weight:600;">${escapeHtml(docTitle)}</span>
+                </div>
+            `;
+
+            if (headings.length === 0) {
+                html += `
+                    <div class="doc-outline-empty">
+                        <div class="doc-outline-empty-icon">
+                            <i data-lucide="heading" style="width:16px;height:16px;"></i>
+                        </div>
+                        <div style="font-weight:600; font-size:0.78rem; color:var(--text-primary);">No Headings Yet</div>
+                        <div style="font-size:0.72rem; line-height:1.4;">
+                            Use the formatting toolbar or shortcuts <kbd style="font-family:monospace; background:var(--bg-hover); padding:1px 4px; border-radius:3px;">⌘1</kbd>, <kbd style="font-family:monospace; background:var(--bg-hover); padding:1px 4px; border-radius:3px;">⌘2</kbd>, <kbd style="font-family:monospace; background:var(--bg-hover); padding:1px 4px; border-radius:3px;">⌘3</kbd> to add headings to your document.
+                        </div>
+                    </div>
+                `;
+                list.innerHTML = html;
+                refreshIcons();
+                return;
+            }
+
+            // Dot colors by heading level
+            const levelDotColors = {
+                1: 'var(--accent-primary)',
+                2: '#8b5cf6',
+                3: '#10b981',
+                4: '#f59e0b',
+                5: '#ec4899',
+                6: '#64748b'
+            };
+
+            headings.forEach((heading, idx) => {
+                const tag = heading.tagName.toLowerCase();
+                const level = parseInt(tag.charAt(1), 10) || 1;
+                const text = heading.innerText.trim() || `(Untitled ${tag.toUpperCase()})`;
+
+                // Ensure unique, stable heading ID
+                let headingId = heading.getAttribute('id');
+                if (!headingId) {
+                    headingId = `doc-h-${idx}-${text.slice(0, 20).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+                    heading.setAttribute('id', headingId);
+                }
+
+                const isActive = activeOutlineHeadingId === headingId;
+                const dotColor = levelDotColors[level] || 'var(--border-strong)';
+
+                html += `
+                    <a href="javascript:void(0)" 
+                       class="doc-outline-item doc-outline-level-${level} ${isActive ? 'active' : ''}" 
+                       data-heading-id="${headingId}"
+                       onclick="scrollToDocOutlineItem('${headingId}')" 
+                       title="${escapeHtml(text)}">
+                        <span class="doc-outline-dot" style="background: ${dotColor};"></span>
+                        <span class="truncate">${escapeHtml(text)}</span>
+                    </a>
+                `;
+            });
+
+            list.innerHTML = html;
+            refreshIcons();
+        }
+
+        function scrollToDocTop() {
+            activeOutlineHeadingId = null;
+            const editorPane = document.querySelector('.doc-editor-pane');
+            if (editorPane) {
+                editorPane.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            updateDocOutlineActiveState(null);
+        }
+
+        function scrollToDocOutlineItem(headingId) {
+            const heading = document.getElementById(headingId);
+            if (!heading) return;
+
+            activeOutlineHeadingId = headingId;
+            heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // Apply attention flash animation
+            heading.classList.remove('doc-heading-highlight');
+            void heading.offsetWidth; // Force reflow
+            heading.classList.add('doc-heading-highlight');
+            setTimeout(() => {
+                heading.classList.remove('doc-heading-highlight');
+            }, 1800);
+
+            updateDocOutlineActiveState(headingId);
+        }
+
+        function updateDocOutlineActiveState(activeId) {
+            const items = document.querySelectorAll('#docOutlineList .doc-outline-item');
+            items.forEach(item => {
+                if (!activeId) {
+                    if (item.classList.contains('doc-outline-title')) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                } else {
+                    const itemId = item.getAttribute('data-heading-id');
+                    if (itemId === activeId) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        function initDocOutlineScrollSpy() {
+            const editorPane = document.querySelector('.doc-editor-pane');
+            if (!editorPane || docOutlineScrollSpyAttached) return;
+
+            docOutlineScrollSpyAttached = true;
+            let ticking = false;
+
+            editorPane.addEventListener('scroll', () => {
+                if (!ticking) {
+                    window.requestAnimationFrame(() => {
+                        handleDocOutlineScroll();
+                        ticking = false;
+                    });
+                    ticking = true;
+                }
+            }, { passive: true });
+        }
+
+        function handleDocOutlineScroll() {
+            const outline = document.getElementById('docOutlineDrawer');
+            if (!outline || outline.classList.contains('hidden')) return;
+
+            const sheet = document.getElementById('docPageSheet');
+            if (!sheet) return;
+
+            const editorPane = document.querySelector('.doc-editor-pane');
+            const paneTop = editorPane ? editorPane.getBoundingClientRect().top : 0;
+
+            const headings = Array.from(sheet.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+            if (headings.length === 0) return;
+
+            // Check if user scrolled near top
+            if (editorPane && editorPane.scrollTop < 60) {
+                if (activeOutlineHeadingId !== null) {
+                    activeOutlineHeadingId = null;
+                    updateDocOutlineActiveState(null);
+                }
+                return;
+            }
+
+            // Find heading closest to top viewport line
+            let currentHeading = null;
+            const threshold = paneTop + 140;
+
+            for (let i = 0; i < headings.length; i++) {
+                const h = headings[i];
+                const rect = h.getBoundingClientRect();
+                if (rect.top <= threshold) {
+                    currentHeading = h;
+                } else {
+                    break;
+                }
+            }
+
+            if (currentHeading) {
+                const headingId = currentHeading.getAttribute('id');
+                if (headingId && headingId !== activeOutlineHeadingId) {
+                    activeOutlineHeadingId = headingId;
+                    updateDocOutlineActiveState(headingId);
+                }
+            }
+        }
+
 
         // Find and Replace System
         function toggleDocSearch() {
@@ -6673,10 +7066,14 @@
 
             saveDocSelection();
             onDocChange();
+            if (typeof triggerDocOutlineUpdate === 'function') {
+                triggerDocOutlineUpdate(0);
+            }
             updateDocStats();
             syncToolbarStates();
             toast(`Style: ${label}`);
         }
+
 
         function saveDocSelection() {
             try {
@@ -7006,9 +7403,21 @@
                             const fragment = range.extractContents();
                             const span = document.createElement('span');
                             if (type === 'text') {
-                                span.style.color = color;
-                                const innerEls = fragment.querySelectorAll('[style*="color"]');
-                                innerEls.forEach(el => { el.style.color = ''; });
+                                const isGradient = color && color.includes('gradient');
+                                if (isGradient) {
+                                    span.style.background = color;
+                                    span.style.webkitBackgroundClip = 'text';
+                                    span.style.webkitTextFillColor = 'transparent';
+                                    span.style.backgroundClip = 'text';
+                                    span.style.color = 'transparent';
+                                    // Clear previous gradient/color styles inside
+                                    const innerEls = fragment.querySelectorAll('[style*="color"], [style*="background"]');
+                                    innerEls.forEach(el => { el.style.color = ''; el.style.background = ''; el.style.webkitBackgroundClip = ''; el.style.webkitTextFillColor = ''; el.style.backgroundClip = ''; });
+                                } else {
+                                    span.style.color = color;
+                                    const innerEls = fragment.querySelectorAll('[style*="color"]');
+                                    innerEls.forEach(el => { el.style.color = ''; el.style.background = ''; el.style.webkitBackgroundClip = ''; el.style.webkitTextFillColor = ''; el.style.backgroundClip = ''; });
+                                }
                             } else {
                                 span.style.backgroundColor = color;
                                 const innerEls = fragment.querySelectorAll('[style*="background"]');
@@ -7024,14 +7433,62 @@
                             savedDocRange = newRange.cloneRange();
                         } catch (e) {
                             if (type === 'text') {
-                                document.execCommand('foreColor', false, color);
+                                const isGrad = color && color.includes('gradient');
+                                if (isGrad) {
+                                    // Fallback: create span with gradient for future typing
+                                    const span = document.createElement('span');
+                                    span.style.background = color;
+                                    span.style.webkitBackgroundClip = 'text';
+                                    span.style.webkitTextFillColor = 'transparent';
+                                    span.style.backgroundClip = 'text';
+                                    span.style.color = 'transparent';
+                                    span.textContent = '\u200B';
+                                    range.insertNode(span);
+                                    const nr = document.createRange();
+                                    nr.setStart(span.firstChild, 1);
+                                    nr.collapse(true);
+                                    sel.removeAllRanges();
+                                    sel.addRange(nr);
+                                } else {
+                                    document.execCommand('foreColor', false, color);
+                                }
                             } else {
                                 document.execCommand('hiliteColor', false, color);
                             }
                         }
                     } else {
                         if (type === 'text') {
-                            document.execCommand('foreColor', false, color);
+                            const isGrad = color && color.includes('gradient');
+                            if (isGrad) {
+                                // Collapsed caret: prepare gradient span for next typed chars
+                                const sel2 = window.getSelection();
+                                let node = sel2.anchorNode;
+                                if (node && node.nodeType === 3) {
+                                    const offset = sel2.anchorOffset;
+                                    const span = document.createElement('span');
+                                    span.style.background = color;
+                                    span.style.webkitBackgroundClip = 'text';
+                                    span.style.webkitTextFillColor = 'transparent';
+                                    span.style.backgroundClip = 'text';
+                                    span.style.color = 'transparent';
+                                    span.textContent = '\u200B';
+                                    const after = node.splitText(offset);
+                                    node.parentNode.insertBefore(span, after);
+                                    const nr = document.createRange();
+                                    nr.setStart(span.firstChild, 1);
+                                    nr.collapse(true);
+                                    sel2.removeAllRanges();
+                                    sel2.addRange(nr);
+                                } else if (node) {
+                                    node.style.background = color;
+                                    node.style.webkitBackgroundClip = 'text';
+                                    node.style.webkitTextFillColor = 'transparent';
+                                    node.style.backgroundClip = 'text';
+                                    node.style.color = 'transparent';
+                                }
+                            } else {
+                                document.execCommand('foreColor', false, color);
+                            }
                         } else {
                             document.execCommand('hiliteColor', false, color);
                         }
@@ -7044,6 +7501,13 @@
                 if (ind) ind.style.background = color;
                 const menu = document.getElementById('textColorPicker');
                 if (menu) menu.classList.add('hidden');
+                // Sync custom picker inputs
+                const cIn = document.getElementById('customTextColorInput');
+                const hIn = document.getElementById('customTextColorHex');
+                if (cIn && color && !color.includes('gradient') && /^#[0-9A-Fa-f]{3,6}$/.test(color)) {
+                    cIn.value = color.length === 4 ? '#' + color[1]+color[1]+color[2]+color[2]+color[3]+color[3] : color;
+                    if (hIn) hIn.value = color;
+                }
                 toast('Text color applied');
             } else {
                 const ind = document.getElementById('highlightColorIndicator');
@@ -7056,6 +7520,39 @@
             syncToolbarStates();
             onDocChange();
         }
+
+        function applyCustomTextColor() {
+            const hexInput = document.getElementById('customTextColorHex');
+            const colorInput = document.getElementById('customTextColorInput');
+            let color = (hexInput && hexInput.value.trim()) || (colorInput && colorInput.value) || '#2563eb';
+            if (!color.startsWith('#')) color = '#' + color;
+            if (!/^#[0-9A-Fa-f]{6}$/.test(color) && !/^#[0-9A-Fa-f]{3}$/.test(color)) {
+                toast('Invalid hex color, use #RRGGBB');
+                return;
+            }
+            if (color.length === 4) color = '#' + color[1]+color[1]+color[2]+color[2]+color[3]+color[3];
+            if (colorInput) colorInput.value = color;
+            if (hexInput) hexInput.value = color;
+            applyColor('text', color);
+        }
+
+        // Sync custom text color picker inputs
+        document.addEventListener('DOMContentLoaded', () => {
+            const cIn = document.getElementById('customTextColorInput');
+            const hIn = document.getElementById('customTextColorHex');
+            if (cIn && hIn) {
+                cIn.addEventListener('input', () => { hIn.value = cIn.value; });
+                hIn.addEventListener('input', () => {
+                    let v = hIn.value.trim();
+                    if (!v.startsWith('#')) v = '#' + v;
+                    if (/^#[0-9A-Fa-f]{6}$/.test(v) || /^#[0-9A-Fa-f]{3}$/.test(v)) {
+                        const norm = v.length===4 ? '#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3] : v;
+                        cIn.value = norm;
+                    }
+                });
+                hIn.addEventListener('keydown', (e) => { if (e.key==='Enter') { e.preventDefault(); applyCustomTextColor(); }});
+            }
+        });
 
         function setTextAlign(align) {
             document.getElementById('docPageSheet').focus();
@@ -7282,10 +7779,59 @@
             }
             if (quote === sheet) quote = null;
 
-            const targetBlock = callout || quote;
+            // 3. Check for Code Block (.doc-code-card / pre)
+            let codeCard = node.nodeType === 3 ? node.parentElement : node;
+            while (codeCard && codeCard !== sheet && !codeCard.classList?.contains('doc-code-card') && codeCard.tagName !== 'PRE') {
+                codeCard = codeCard.parentElement;
+            }
+            if (codeCard === sheet) codeCard = null;
+            if (codeCard && codeCard.tagName === 'PRE') {
+                codeCard = codeCard.closest('.doc-code-card') || codeCard;
+            }
+
+            const targetBlock = callout || quote || codeCard;
             if (!targetBlock) return false;
 
             if (e.key === 'Enter') {
+                // Code block has its own Shift+Enter (newline) / Enter (exit) handling
+                if (codeCard) {
+                    if (e.shiftKey) {
+                        // Shift+Enter: New line INSIDE code block — preserve as code
+                        e.preventDefault();
+                        const range = sel.getRangeAt(0);
+                        range.deleteContents();
+                        // In <pre><code> a text "\n" preserves code formatting better than <br>
+                        const nl = document.createTextNode('\n');
+                        range.insertNode(nl);
+                        const newRange = document.createRange();
+                        newRange.setStartAfter(nl);
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                        onDocChange();
+                        updateDocStats();
+                        setTimeout(() => scrollCursorIntoView(), 10);
+                        return true;
+                    } else {
+                        // Enter: Exit code block to normal paragraph
+                        e.preventDefault();
+                        const p = document.createElement('p');
+                        p.innerHTML = '<br>';
+                        if (targetBlock.parentNode) {
+                            targetBlock.parentNode.insertBefore(p, targetBlock.nextSibling);
+                        }
+                        const newRange = document.createRange();
+                        newRange.setStart(p, 0);
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                        syncToolbarStates();
+                        onDocChange();
+                        updateDocStats();
+                        setTimeout(() => scrollCursorIntoView(), 10);
+                        return true;
+                    }
+                }
                 if (e.shiftKey) {
                     // Shift+Enter: Insert a soft line break INSIDE the current callout / quote
                     e.preventDefault();
@@ -7441,14 +7987,46 @@
         }
 
         function adjustIndent(delta) {
-            document.getElementById('docPageSheet').focus();
-            if (delta > 0) {
-                document.execCommand('indent', false, null);
+            const sheet = document.getElementById('docPageSheet');
+            if (!sheet) return;
+            sheet.focus();
+            // Try native indent first for list handling, then ensure margin-left is captured for persistence
+            const sel = window.getSelection();
+            let target = null;
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.getRangeAt(0).commonAncestorContainer;
+                if (node.nodeType === 3) node = node.parentElement;
+                while (node && node !== sheet && !['P','H1','H2','H3','H4','BLOCKQUOTE','PRE','LI','DIV'].includes(node.tagName) && !node.classList.contains('doc-callout') && !node.classList.contains('doc-code-card')) {
+                    node = node.parentElement;
+                }
+                if (node && node !== sheet) target = node;
+            }
+            if (target) {
+                // Direct margin-left handling for reliable export persistence
+                const computed = window.getComputedStyle(target);
+                const currentMl = parseFloat(computed.marginLeft) || 0;
+                const step = 40; // 40px per indent level ~ 30pt
+                let nextMl = delta > 0 ? currentMl + step : Math.max(0, currentMl - step);
+                // Also try native for lists, but override with explicit margin for blocks
+                if (target.tagName === 'LI' || target.closest('ul, ol')) {
+                    try { document.execCommand(delta > 0 ? 'indent' : 'outdent', false, null); } catch(e) {}
+                    // Re-query after execCommand
+                    if (sel && sel.rangeCount > 0) {
+                        let n = sel.getRangeAt(0).commonAncestorContainer;
+                        if (n.nodeType === 3) n = n.parentElement;
+                        while (n && n !== sheet && n.tagName !== 'LI') n = n.parentElement;
+                        if (n && n !== sheet) n.style.marginLeft = nextMl > 0 ? nextMl + 'px' : '';
+                    }
+                } else {
+                    target.style.marginLeft = nextMl > 0 ? nextMl + 'px' : '';
+                    // Ensure block keeps its semantic tag, just indented
+                }
             } else {
-                document.execCommand('outdent', false, null);
+                try { document.execCommand(delta > 0 ? 'indent' : 'outdent', false, null); } catch(e) {}
             }
             updateDocStats();
             onDocChange();
+            syncToolbarStates();
         }
 
         function toggleInsertDropdown(e) {
@@ -9077,14 +9655,145 @@
         }
 
         function downloadCurrentPdf() {
+            if (window.pdfEngine && typeof window.pdfEngine.exportEditedPdf === 'function') {
+                window.pdfEngine.exportEditedPdf();
+                return;
+            }
             toast(`Downloading "${currentPdfFileName}"...`);
             const canvas = document.getElementById('pdfRenderCanvas');
             if (canvas) {
                 const link = document.createElement('a');
                 link.href = canvas.toDataURL('image/png');
+                link.download = `${(currentPdfFileName || 'document').replace(/\.pdf$/i, '')}_page.png`;
                 link.click();
             }
         }
+        // ==========================================
+        // PDF FULLSCREEN MODE CONTROLLER
+        // ==========================================
+        let isPdfFullscreen = false;
+        let pdfPreFullscreenState = {
+            width: '',
+            height: '',
+            layoutMode: 'pdf-left'
+        };
+
+        function togglePdfFullscreen() {
+            if (isPdfFullscreen) {
+                exitPdfFullscreen();
+            } else {
+                enterPdfFullscreen();
+            }
+        }
+
+        function enterPdfFullscreen() {
+            const pane = document.getElementById('pdfReferencePane');
+            if (!pane) return;
+
+            isPdfFullscreen = true;
+            // Cache current dimensions and layout
+            pdfPreFullscreenState = {
+                width: pane.style.width,
+                height: pane.style.height,
+                layoutMode: docLayoutMode || 'pdf-left'
+            };
+
+            pane.classList.add('pdf-fullscreen');
+            
+            // Try native HTML5 Fullscreen API if permitted
+            try {
+                if (pane.requestFullscreen) {
+                    pane.requestFullscreen().catch(() => {});
+                } else if (pane.webkitRequestFullscreen) {
+                    pane.webkitRequestFullscreen().catch(() => {});
+                }
+            } catch (e) {}
+
+            // Update Fullscreen button state and icon
+            const btn = document.getElementById('pdfFullscreenBtn');
+            if (btn) {
+                btn.title = 'Exit Full Screen (Esc)';
+                btn.innerHTML = '<i data-lucide="minimize-2" id="pdfFullscreenIcon" style="width:14px;height:14px;"></i>';
+                btn.classList.add('active');
+            }
+
+            // Adjust PDF viewport scale to crisp fit in fullscreen
+            setTimeout(() => {
+                if (typeof updatePdfSizeToFitPane === 'function') {
+                    updatePdfSizeToFitPane();
+                }
+                refreshIcons();
+            }, 60);
+
+            toast('Entered Full Screen PDF view (Press Esc to exit)');
+        }
+
+        function exitPdfFullscreen() {
+            const pane = document.getElementById('pdfReferencePane');
+            if (!pane) return;
+
+            isPdfFullscreen = false;
+            pane.classList.remove('pdf-fullscreen');
+
+            // Restore original dimension inline styles
+            if (pdfPreFullscreenState) {
+                pane.style.width = pdfPreFullscreenState.width || '';
+                pane.style.height = pdfPreFullscreenState.height || '';
+            }
+
+            // Exit native fullscreen if active
+            try {
+                if (document.fullscreenElement || document.webkitFullscreenElement) {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen().catch(() => {});
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen().catch(() => {});
+                    }
+                }
+            } catch (e) {}
+
+            // Reset button icon and tooltip
+            const btn = document.getElementById('pdfFullscreenBtn');
+            if (btn) {
+                btn.title = 'Full Screen (Maximize PDF)';
+                btn.innerHTML = '<i data-lucide="maximize-2" id="pdfFullscreenIcon" style="width:14px;height:14px;"></i>';
+                btn.classList.remove('active');
+            }
+
+            // Readjust zoom back to split pane bounds
+            setTimeout(() => {
+                if (typeof updatePdfSizeToFitPane === 'function') {
+                    updatePdfSizeToFitPane();
+                }
+                refreshIcons();
+            }, 60);
+
+            toast('Exited Full Screen PDF view');
+        }
+
+        // Global Escape & Fullscreen Sync Listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isPdfFullscreen) {
+                // If finding bar is focused, allow find bar to close first, otherwise exit fullscreen
+                const findBar = document.getElementById('pdfFindBar');
+                if (findBar && !findBar.classList.contains('hidden') && document.activeElement === document.getElementById('pdfFindInput')) {
+                    return;
+                }
+                exitPdfFullscreen();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement && isPdfFullscreen) {
+                exitPdfFullscreen();
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!document.webkitFullscreenElement && isPdfFullscreen) {
+                exitPdfFullscreen();
+            }
+        });
+
         // Modular PDF engine and annotations are managed by static/js/pdf/*.js
 
 
@@ -9541,7 +10250,7 @@
                 }
                 url = `/documents/${currentDoc.id}/activity?page=${currentActivityPage}&size=20`;
             } else {
-                const wsId = currentWorkspaceId || (currentWorkspace && currentWorkspace.id);
+                const wsId = activeWorkspace && activeWorkspace.id;
                 if (!wsId) {
                     container.innerHTML = `
                         <div style="text-align: center; color: var(--text-muted); padding: 2rem 1rem;">
@@ -9838,11 +10547,16 @@ async function openDocInfoModal() {
             const content = sheet ? sheet.innerHTML : '';
             broadcastDocumentEdit(content, cleanTitle);
 
+            if (typeof triggerDocOutlineUpdate === 'function') {
+                triggerDocOutlineUpdate(150);
+            }
+
             if (docRenameTimeout) clearTimeout(docRenameTimeout);
             docRenameTimeout = setTimeout(async () => {
                 await persistDocRename(cleanTitle);
             }, 500);
         }
+
 
         async function onDocTitleBlur(newTitle) {
             if (docRenameTimeout) {
@@ -9917,6 +10631,10 @@ async function openDocInfoModal() {
 
             // Real-time broadcast to all active collaborators
             broadcastDocumentEdit(content, title);
+
+            if (typeof triggerDocOutlineUpdate === 'function') {
+                triggerDocOutlineUpdate(300);
+            }
 
             if (docAutoSaveTimeout) clearTimeout(docAutoSaveTimeout);
             docAutoSaveTimeout = setTimeout(async () => {
@@ -10468,30 +11186,34 @@ async function openDocInfoModal() {
         }
 
         async function triggerGoogleAuth() {
-            try {
-                const configRes = await fetch('/auth/config');
-                let googleClientId = '';
-                if (configRes.ok) {
-                    const cfg = await configRes.json();
-                    googleClientId = cfg.googleClientId;
-                }
-
-                if (window.google && window.google.accounts && googleClientId && !googleClientId.includes('YOUR_GOOGLE')) {
-                    google.accounts.id.initialize({
-                        client_id: googleClientId,
-                        callback: handleGoogleCredentialResponse
-                    });
-                    google.accounts.id.prompt((notification) => {
-                        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                            performGoogleLoginFetch('google_id_token_demo', 'google.user@syncpad.com', 'Google User', 'sub_google_123');
-                        }
-                    });
-                } else {
-                    await performGoogleLoginFetch('google_id_token_demo', 'google.user@syncpad.com', 'Google User', 'sub_google_123');
-                }
-            } catch (e) {
-                await performGoogleLoginFetch('google_id_token_demo', 'google.user@syncpad.com', 'Google User', 'sub_google_123');
+            const configRes = await fetch('/auth/config');
+            if (!configRes.ok) {
+                toast('Unable to verify Google configuration. Please use email/password.');
+                return;
             }
+            const cfg = await configRes.json();
+            const googleClientId = cfg.googleClientId || '';
+            const isConfigured = googleClientId && !googleClientId.includes('YOUR_GOOGLE') && googleClientId.includes('.apps.googleusercontent.com');
+
+            if (!isConfigured) {
+                toast('Google Sign-In is not configured. Please set GOOGLE_CLIENT_ID environment variable with a valid OAuth 2.0 Client ID, or use email/password.');
+                return;
+            }
+            if (!window.google || !window.google.accounts) {
+                toast('Google Sign-In library not loaded. Please check your connection and try again.');
+                return;
+            }
+            google.accounts.id.initialize({
+                client_id: googleClientId,
+                callback: handleGoogleCredentialResponse
+            });
+            google.accounts.id.prompt((notification) => {
+                const notDisplayed = notification.isNotDisplayed && notification.isNotDisplayed();
+                const skipped = notification.isSkippedMoment && notification.isSkippedMoment();
+                if (notDisplayed || skipped) {
+                    toast('Google One Tap was not displayed. Please use the Google button or email/password.');
+                }
+            });
         }
 
         async function handleGoogleCredentialResponse(response) {
@@ -10521,13 +11243,24 @@ async function openDocInfoModal() {
                     const data = await res.json();
                     token = data.token;
                     localStorage.setItem('syncpad_token', token);
+                    if (data.refreshToken) localStorage.setItem('syncpad_refreshToken', data.refreshToken);
                     currentUser = { id: data.id, name: data.name || name, email: data.email || email };
                     localStorage.setItem('syncpad_user', JSON.stringify(currentUser));
                     showMainShell();
                     loadUserWorkspaces();
                     toast(`Welcome, ${currentUser.name}! Signed in via Google.`);
                 } else {
-                    toast('Google sign-in failed');
+                    let msg = 'Google sign-in failed';
+                    try {
+                        const err = await res.json();
+                        if (err.message) msg = err.message;
+                        else if (err.error) msg = err.error;
+                    } catch (_) {}
+                    if (res.status === 401 && msg.includes('not configured')) {
+                        toast('Google Sign-In not configured. Please use email/password.');
+                    } else {
+                        toast(msg);
+                    }
                 }
             } catch (err) {
                 toast('Google sign-in failed');
@@ -11849,6 +12582,10 @@ async function openDocInfoModal() {
             if (typeof initPdfEngine === 'function') {
                 initPdfEngine();
             }
+            if (typeof updateDocOutline === 'function') {
+                updateDocOutline();
+                initDocOutlineScrollSpy();
+            }
             const sheet = document.getElementById('docPageSheet');
             const pane = document.getElementById('docEditorPane');
             if (pane) {
@@ -11856,6 +12593,7 @@ async function openDocInfoModal() {
                     updateDocStats();
                 }, { passive: true });
             }
+
 
             if (sheet) {
                 sheet.addEventListener('input', () => {
@@ -12059,6 +12797,59 @@ async function openDocInfoModal() {
 
         async function useTemplate(templateId) {
             try {
+                // If we are currently viewing a document (doc screen), apply template to current doc instead of creating new
+                const isDocViewActive = currentDoc && currentDoc.id && document.getElementById('editorView') && !document.getElementById('editorView').classList.contains('hidden');
+                if (isDocViewActive) {
+                    toast('📄 Loading template onto current document...');
+                    // Fetch template details (we already have it in gallery, but fetch to get content)
+                    const tplRes = await fetch(`/templates`, { headers: { 'Authorization': 'Bearer ' + token } });
+                    let template = null;
+                    if (tplRes.ok) {
+                        const all = await tplRes.json();
+                        template = all.find(t => String(t.id) === String(templateId));
+                    }
+                    if (!template) {
+                        // Fallback: fetch single template if not found (should not happen)
+                        const singleRes = await fetch(`/templates/${templateId}`, { headers: { 'Authorization': 'Bearer ' + token } });
+                        if (singleRes.ok) template = await singleRes.json();
+                    }
+                    if (!template || !template.content) throw new Error('Template not found');
+                    // Confirm if current doc has content
+                    const sheet = document.getElementById('docPageSheet');
+                    const hasContent = sheet && sheet.innerText.trim().length > 50;
+                    if (hasContent && !confirm(`Replace current document "${currentDoc.title}" content with template "${template.title}"? This will overwrite the current content.`)) {
+                        return;
+                    }
+                    const res = await fetch(`/documents/${currentDoc.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                        body: JSON.stringify({ title: currentDoc.title, content: template.content })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Failed to apply template');
+                    }
+                    const updated = await res.json();
+                    currentDoc.content = updated.content;
+                    currentDoc.title = updated.title;
+                    // Update editor UI 1:1
+                    const titleInput = document.getElementById('docTitleInput');
+                    if (titleInput) titleInput.value = updated.title;
+                    if (sheet) {
+                        sheet.innerHTML = updated.content;
+                        if (window.latexEngine) window.latexEngine.initAllCards(sheet);
+                        if (typeof normalizeDocChecklists === 'function') normalizeDocChecklists(sheet);
+                        refreshIcons();
+                        updateDocStats();
+                        if (typeof updateDocOutline === 'function') updateDocOutline();
+                    }
+                    syncDocumentInLists(currentDoc.id, updated.title, updated.content);
+                    renderDashboardGrids();
+                    closeTemplatesModal();
+                    toast(`✅ Loaded template "${template.title}" onto current document!`);
+                    return;
+                }
+                // Default: create new doc from template (when not on doc screen)
                 toast('📄 Instantiating document from template blueprint...');
                 const wsId = activeWorkspace ? activeWorkspace.id : '';
                 const url = wsId ? `/templates/${templateId}/instantiate?workspaceId=${wsId}` : `/templates/${templateId}/instantiate`;

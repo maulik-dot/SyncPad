@@ -3845,6 +3845,56 @@ body.is-resizing-split-pane *,
     box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
 }
 
+/* Interactive Inline LaTeX Equations */
+.doc-latex-inline {
+    display: inline-block;
+    padding: 0.12rem 0.38rem;
+    margin: 0 0.15rem;
+    border-radius: 4px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    cursor: pointer;
+    vertical-align: middle;
+    transition: all 0.15s ease;
+    user-select: all;
+    font-size: 0.95em;
+    line-height: 1.2;
+}
+
+.doc-latex-inline:hover {
+    background: rgba(139, 92, 246, 0.18);
+    border-color: #8b5cf6;
+    box-shadow: 0 2px 5px rgba(139, 92, 246, 0.2);
+    transform: translateY(-1px);
+}
+
+.doc-latex-inline .katex {
+    font-size: 1.05em;
+}
+
+[data-theme="dark"] .doc-latex-inline {
+    background: rgba(168, 85, 247, 0.16);
+    border-color: rgba(168, 85, 247, 0.38);
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .doc-latex-inline:hover {
+    background: rgba(168, 85, 247, 0.28);
+    border-color: #a855f7;
+    box-shadow: 0 2px 6px rgba(168, 85, 247, 0.25);
+}
+
+.math-aligned-table {
+    border-collapse: collapse;
+    margin: 4px auto;
+    font-size: 0.98em;
+}
+
+.math-aligned-table td {
+    padding: 3px 8px;
+    vertical-align: baseline;
+}
+
 /* Math Fallback Renderer Typography */
 .math-fallback-render {
     font-family: 'KaTeX_Main', 'Cambria Math', 'Latin Modern Math', 'Times New Roman', serif;
