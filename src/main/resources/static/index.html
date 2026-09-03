@@ -983,6 +983,7 @@
                                 <button class="doc-menu-item" onclick="insertElement('link')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="link" style="width:14px;height:14px;"></i> Link</span><span style="font-size: 0.7rem; color: var(--text-muted);">⌘K</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('image')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="image" style="width:14px;height:14px;"></i> Image</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('table')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="table" style="width:14px;height:14px;"></i> Table</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('latex')"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-family: 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">L<sup>A</sup>T<sub>E</sub>X</span> LaTeX Equation</span><span style="font-size: 0.7rem; color: var(--text-muted);">⌘M</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('divider')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="minus" style="width:14px;height:14px;"></i> Divider</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('mention')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="at-sign" style="width:14px;height:14px;"></i> Mention @</span></button>
                                 <button class="doc-menu-item" onclick="insertElement('comment')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="message-square-plus" style="width:14px;height:14px;"></i> Add comment</span></button>
@@ -8124,20 +8125,64 @@
                 captureSelectionForComment();
                 toggleCommentsSidebar();
             } else if (type === 'latex') {
+                const sheet = document.getElementById('docPageSheet');
+                if (sheet) sheet.focus();
+                restoreDocSelection();
+
+                let selectedFormula = '';
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    selectedFormula = sel.toString().trim();
+                }
+
                 if (window.latexEngine) {
-                    const latexHtml = window.latexEngine.generateCardHtml('');
-                    document.execCommand('insertHTML', false, latexHtml);
+                    const latexHtml = window.latexEngine.generateCardHtml(selectedFormula);
+                    let inserted = false;
+
+                    if (sel && sel.rangeCount > 0 && sheet && sheet.contains(sel.anchorNode)) {
+                        try {
+                            const range = sel.getRangeAt(0);
+                            range.deleteContents();
+                            const frag = range.createContextualFragment(latexHtml + '<p><br></p>');
+                            range.insertNode(frag);
+                            inserted = true;
+                        } catch (e) {
+                            inserted = false;
+                        }
+                    }
+
+                    if (!inserted) {
+                        try {
+                            inserted = document.execCommand('insertHTML', false, latexHtml);
+                        } catch (e) {
+                            inserted = false;
+                        }
+                    }
+
+                    if (!inserted && sheet) {
+                        const temp = document.createElement('div');
+                        temp.innerHTML = latexHtml + '<p><br></p>';
+                        while (temp.firstChild) {
+                            sheet.appendChild(temp.firstChild);
+                        }
+                        inserted = true;
+                    }
+
                     refreshIcons();
                     setTimeout(() => {
-                        const sheet = document.getElementById('docPageSheet');
                         if (sheet) {
                             window.latexEngine.initAllCards(sheet);
-                            const lastCard = sheet.querySelector('.doc-latex-card:last-of-type');
-                            if (lastCard) {
-                                window.latexEngine.openHoverEditor(lastCard.id);
+                            const cards = sheet.querySelectorAll('.doc-latex-card');
+                            const targetCard = cards[cards.length - 1];
+                            if (targetCard) {
+                                window.latexEngine.openHoverEditor(targetCard);
                             }
                         }
                     }, 60);
+
+                    if (typeof showToastNotification === 'function') {
+                        showToastNotification('Inserted LaTeX equation card!', 'success');
+                    }
                 }
             }
             updateDocStats();
