@@ -198,7 +198,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     }
                     String documentIdStr = parts[0];
                     String action = parts[1];
-                    if (!action.equals("edit") && !action.equals("save") && !action.equals("pdf-annotation")) {
+                    if (!action.equals("edit") && !action.equals("save") && !action.equals("pdf-annotation") && !action.equals("crdt") && !action.equals("presence")) {
                         throw new AccessDeniedException("Unsupported document SEND action: " + action);
                     }
                     try {

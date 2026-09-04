@@ -212,6 +212,17 @@ public class DocumentService {
             }
         }
 
+        if (workspaceName == null || workspaceName.isBlank()) {
+            if (folder != null && folder.getWorkspaceName() != null && !folder.getWorkspaceName().isBlank()) {
+                workspaceName = folder.getWorkspaceName();
+            } else if (workspaceRepository != null) {
+                List<Workspace> ownedWs = workspaceRepository.findByOwnerId(owner.getId());
+                if (ownedWs != null && !ownedWs.isEmpty()) {
+                    workspaceName = ownedWs.get(0).getName();
+                }
+            }
+        }
+
         if (workspaceName != null && !workspaceName.isBlank()) {
             java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(workspaceName);
             if (wsOpt.isPresent()) {
@@ -417,8 +428,15 @@ public class DocumentService {
                 .filter(doc -> !doc.isTrashed())
                 .filter(doc -> {
                     if (workspaceFilter == null || workspaceFilter.isBlank()) return true;
-                    if (doc.getWorkspaceName() == null) return false;
-                    return doc.getWorkspaceName().equalsIgnoreCase(workspaceFilter.trim());
+                    String docWs = doc.getWorkspaceName();
+                    if (docWs == null && doc.getFolder() != null) {
+                        docWs = doc.getFolder().getWorkspaceName();
+                    }
+                    if (docWs == null) {
+                        List<Workspace> owned = workspaceRepository.findByOwnerId(user.getId());
+                        return !owned.isEmpty() && owned.get(0).getName().equalsIgnoreCase(workspaceFilter.trim());
+                    }
+                    return docWs.equalsIgnoreCase(workspaceFilter.trim());
                 })
                 .filter(doc -> getEffectiveRole(doc, user) != null)
                 .filter(doc -> {
@@ -760,6 +778,53 @@ public class DocumentService {
 
         permissionRepository.findByUserAndDocument(targetUser, document)
                 .ifPresent(permissionRepository::delete);
+    }
+
+    @Transactional
+    public Document moveDocument(Long documentId, Long targetFolderId, String targetWorkspaceName, String userEmail) {
+        User user = getUserByEmail(userEmail);
+        Document document = findDocumentById(documentId);
+
+        Role effectiveRole = getEffectiveRole(document, user);
+        if (effectiveRole == null || effectiveRole == Role.VIEWER || effectiveRole == Role.COMMENTER) {
+            throw new PermissionDeniedException("You do not have permission to move this document");
+        }
+
+        Folder targetFolder = null;
+        if (targetFolderId != null) {
+            targetFolder = folderRepository.findById(targetFolderId)
+                    .orElseThrow(() -> new DocumentNotFoundException("Target folder not found with ID: " + targetFolderId));
+            Role folderRole = folderService.getEffectiveRole(targetFolder, user);
+            if (folderRole == null || folderRole == Role.VIEWER || folderRole == Role.RESTRICTED) {
+                throw new PermissionDeniedException("You do not have permission to add documents to the target folder");
+            }
+            if (targetWorkspaceName == null || targetWorkspaceName.isBlank()) {
+                targetWorkspaceName = targetFolder.getWorkspaceName();
+            }
+        }
+
+        if (targetWorkspaceName != null && !targetWorkspaceName.isBlank()) {
+            java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(targetWorkspaceName.trim());
+            if (wsOpt.isPresent()) {
+                Workspace ws = wsOpt.get();
+                boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(user.getId());
+                boolean hasWsPerm = workspacePermissionRepository.findByUserAndWorkspace(user, ws)
+                        .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
+                        .orElse(false);
+                if (!isWsOwner && !hasWsPerm) {
+                    throw new PermissionDeniedException("You do not have permission to move documents to workspace '" + targetWorkspaceName + "'");
+                }
+            }
+            document.setWorkspaceName(targetWorkspaceName.trim());
+        }
+
+        document.setFolder(targetFolder);
+        document.setUpdatedAt(java.time.LocalDateTime.now());
+        Document saved = documentRepository.save(document);
+        if (auditLogService != null) {
+            auditLogService.log(user, null, saved, "DOCUMENT_MOVED", "Moved document to " + (targetFolder != null ? ("folder '" + targetFolder.getName() + "'") : "workspace root"));
+        }
+        return saved;
     }
 
     public List<DocumentVersionResponse> getVersions(Long documentId, String userEmail) {
@@ -1119,5 +1184,26 @@ public class DocumentService {
     public boolean isDocumentStarred(Long documentId, Long userId) {
         if (documentId == null || userId == null || userFavoriteRepository == null) return false;
         return userFavoriteRepository.existsByUserIdAndDocumentId(userId, documentId);
+    }
+
+    public DocumentResponse toResponse(Document doc, String userEmail) {
+        if (doc == null) return null;
+        boolean starred = false;
+        try {
+            if (userEmail != null) {
+                User user = getUserByEmail(userEmail);
+                if (user != null) {
+                    starred = isDocumentStarred(doc.getId(), user.getId());
+                }
+            }
+        } catch (Exception e) { /* user not found is fine */ }
+        return DocumentResponse.from(doc, starred);
+    }
+
+    public List<DocumentResponse> toResponses(List<Document> docs, String userEmail) {
+        if (docs == null) return java.util.Collections.emptyList();
+        return docs.stream()
+                .map(doc -> toResponse(doc, userEmail))
+                .collect(Collectors.toList());
     }
 }

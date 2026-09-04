@@ -80,6 +80,7 @@ public class DocumentWebSocketController {
         message.setDocumentId(documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/save")
@@ -100,6 +101,7 @@ public class DocumentWebSocketController {
         message.setType("SAVED");
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/presence")
@@ -119,6 +121,7 @@ public class DocumentWebSocketController {
         message.put("timestamp", System.currentTimeMillis());
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".presence", (Object) message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/presence", (Object) message);
     }
 
     @MessageMapping("/documents/{documentId}/pdf-annotation")
@@ -137,5 +140,6 @@ public class DocumentWebSocketController {
         message.put("documentId", documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".pdf-annotations", (Object) message);
+        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/pdf-annotations", (Object) message);
     }
 }
