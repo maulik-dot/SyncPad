@@ -87,4 +87,51 @@ public class ShareLinkServiceTest {
             documentService.getDocumentByShareToken("token123", null);
         });
     }
+
+    @Test
+    public void testGenerateShareLinkCommenterAndEditorSuccess() {
+        User owner = new User("Alice", "alice@example.com", "pass");
+        owner.setId(1L);
+        Document doc = new Document("Test Doc", "Content", owner);
+        doc.setId(10L);
+
+        DocumentPermission perm = new DocumentPermission(owner, doc, Role.OWNER);
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(owner));
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(doc));
+        when(permissionRepository.findByUserAndDocument(owner, doc)).thenReturn(Optional.of(perm));
+        when(shareLinkRepository.findByDocumentAndActiveTrue(doc)).thenReturn(Optional.empty());
+        when(shareLinkRepository.save(any(ShareLink.class))).thenAnswer(i -> i.getArgument(0));
+
+        CreateShareLinkRequest reqCommenter = new CreateShareLinkRequest(Role.COMMENTER, 0);
+        ShareLinkResponse respCommenter = documentService.generateShareLink(10L, "alice@example.com", reqCommenter);
+        assertNotNull(respCommenter);
+        assertEquals(Role.COMMENTER, respCommenter.getRole());
+
+        CreateShareLinkRequest reqEditor = new CreateShareLinkRequest(Role.EDITOR, 0);
+        ShareLinkResponse respEditor = documentService.generateShareLink(10L, "alice@example.com", reqEditor);
+        assertNotNull(respEditor);
+        assertEquals(Role.EDITOR, respEditor.getRole());
+    }
+
+    @Test
+    public void testGetActiveShareLink() {
+        User owner = new User("Alice", "alice@example.com", "pass");
+        owner.setId(1L);
+        Document doc = new Document("Test Doc", "Content", owner);
+        doc.setId(10L);
+
+        DocumentPermission perm = new DocumentPermission(owner, doc, Role.OWNER);
+        ShareLink activeLink = new ShareLink(doc, "activeToken123", Role.COMMENTER, null);
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(owner));
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(doc));
+        when(permissionRepository.findByUserAndDocument(owner, doc)).thenReturn(Optional.of(perm));
+        when(shareLinkRepository.findByDocumentAndActiveTrue(doc)).thenReturn(Optional.of(activeLink));
+
+        Optional<ShareLinkResponse> result = documentService.getActiveShareLink(10L, "alice@example.com");
+        org.junit.jupiter.api.Assertions.assertTrue(result.isPresent());
+        assertEquals("activeToken123", result.get().getToken());
+        assertEquals(Role.COMMENTER, result.get().getRole());
+    }
 }

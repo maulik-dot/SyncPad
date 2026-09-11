@@ -1,0 +1,92 @@
+            <aside id="sidebar" class="sidebar">
+                
+                <!-- WORKSPACE SWITCHER DROPDOWN HEADER -->
+                <div style="position: relative; margin-bottom: 1rem;">
+                    <button onclick="toggleWorkspaceMenu()" class="btn btn-outline" style="width: 100%; justify-content: space-between; padding: 0.55rem 0.75rem; border-color: var(--border-color); background: var(--bg-surface);">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden;">
+                            <div id="wsInitialBadge" class="avatar" style="width: 26px; height: 26px; font-size: 0.75rem; background: var(--accent-primary);">P</div>
+                            <span id="wsCurrentName" style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Personal Workspace</span>
+                        </div>
+                        <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text-muted);flex-shrink:0;"></i>
+                    </button>
+
+                    <!-- WORKSPACE DROPDOWN MENU -->
+                    <div id="workspaceMenu" class="card hidden" style="position: absolute; top: 110%; left: 0; right: 0; z-index: 50; padding: 0.5rem; box-shadow: var(--shadow-lg);">
+                        <div id="workspaceMenuList" style="display: flex; flex-direction: column; gap: 0.2rem; max-height: 180px; overflow-y: auto;">
+                            <!-- Workspaces dynamically rendered -->
+                        </div>
+                        <div style="border-top: 1px solid var(--border-color); margin-top: 0.5rem; padding-top: 0.5rem;">
+                            <button onclick="openNewWorkspaceContainerModal()" class="sidebar-item" style="width: 100%; text-align: left; background: transparent; border: none; color: var(--accent-primary);">
+                                <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                                <span>Create Workspace</span>
+                            </button>
+                            <button onclick="openWorkspaceShareModal()" class="sidebar-item" style="width: 100%; text-align: left; background: transparent; border: none;">
+                                <i data-lucide="users" style="width:16px;height:16px;"></i>
+                                <span>Workspace Members</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW ITEM BUTTON (DOC / WHITEBOARD / FOLDER) -->
+                <button class="btn btn-primary" onclick="openCreateModal()" style="width: 100%; justify-content: flex-start; padding: 0.65rem 0.85rem; margin-bottom: 1rem;">
+                    <i data-lucide="plus" style="width:18px;height:18px;"></i>
+                    <span>New Item</span>
+                </button>
+
+                <!-- SIDEBAR NAV -->
+                <nav class="sidebar-nav">
+                    <a href="#" class="sidebar-item active" id="navHomeItem" onclick="showHomeView(this)">
+                        <i data-lucide="home" style="width:18px;height:18px;"></i>
+                        <span>Home Overview</span>
+                    </a>
+                    <a href="#" class="sidebar-item" id="navDashboardItem" onclick="showWorkspaceDashboardView(this)">
+                        <i data-lucide="layout-grid" style="width:18px;height:18px;"></i>
+                        <span>Active Workspace</span>
+                    </a>
+
+                    <div class="sidebar-section-title">Views</div>
+                    <a href="#" class="sidebar-item" id="navNotificationsItem" onclick="showNotificationsView(this)">
+                        <i data-lucide="bell" style="width:18px;height:18px;"></i>
+                        <span>Notifications</span>
+                        <span id="sidebarNotifBadge" class="notif-badge-pill" style="display:none; margin-left:auto; font-size:0.68rem; padding:1px 6px; background:var(--primary); color:#fff;">0</span>
+                    </a>
+                    <a href="#" class="sidebar-item" id="navSharedItem" onclick="showSharedWithMeView(this)">
+                        <i data-lucide="users" style="width:18px;height:18px;"></i>
+                        <span>Shared with me</span>
+                        <span id="sidebarSharedCount" class="notif-badge-pill role" style="display:none; margin-left:auto; font-size:0.68rem; padding:1px 6px;">0</span>
+                    </a>
+                    <a href="#" class="sidebar-item" id="navStarredItem" onclick="switchDashboardTab('starred', this)">
+                        <i data-lucide="star" style="width:18px;height:18px;color:#f59e0b;"></i>
+                        <span>Starred</span>
+                        <span id="sidebarStarredCount" class="notif-badge-pill role" style="display:none; margin-left:auto; font-size:0.68rem; padding:1px 6px;">0</span>
+                    </a>
+                    <a href="#" class="sidebar-item" onclick="switchDashboardTab('recent', this)">
+                        <i data-lucide="clock" style="width:18px;height:18px;"></i>
+                        <span>Recent</span>
+                    </a>
+                    <a href="#" class="sidebar-item" onclick="switchDashboardTab('trash', this)">
+                        <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
+                        <span>Trash</span>
+                    </a>
+                </nav>
+
+                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color); margin-top: auto;">
+                    <a href="#" class="sidebar-item" onclick="openSettingsView()">
+                        <i data-lucide="settings" style="width:18px;height:18px;"></i>
+                        <span>Settings</span>
+                    </a>
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; margin-top: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <div id="userAvatar" class="avatar">U</div>
+                            <div>
+                                <div id="userName" style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">User</div>
+                                <div id="userEmailDisplay" style="font-size: 0.72rem; color: var(--text-muted);">user@syncpad.com</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-icon btn-icon-danger" onclick="logout()" title="Sign Out" aria-label="Sign Out">
+                            <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
+                </div>
+            </aside>

@@ -270,7 +270,6 @@ public class CommentService {
             event.put("comment", payload);
 
             messagingTemplate.convertAndSend("/topic/documents." + documentId, (Object) event);
-            messagingTemplate.convertAndSend("/topic/documents/" + documentId, (Object) event);
         } catch (Exception ignored) {
             // Client may be offline
         }

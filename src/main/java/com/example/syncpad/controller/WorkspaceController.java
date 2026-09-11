@@ -138,9 +138,10 @@ public class WorkspaceController {
         return ResponseEntity.ok(new PermissionResponse(
                 permission.getId(),
                 permission.getUser().getId(),
-                permission.getUser().getEmail(),
                 permission.getUser().getName(),
-                permission.getRole()
+                permission.getUser().getEmail(),
+                permission.getRole(),
+                permission.getExpiresAt()
         ));
     }
 
@@ -151,9 +152,10 @@ public class WorkspaceController {
                 .map(p -> new PermissionResponse(
                         p.getId(),
                         p.getUser().getId(),
-                        p.getUser().getEmail(),
                         p.getUser().getName(),
-                        p.getRole()
+                        p.getUser().getEmail(),
+                        p.getRole(),
+                        p.getExpiresAt()
                 ))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);
@@ -178,9 +180,10 @@ public class WorkspaceController {
         return ResponseEntity.ok(new PermissionResponse(
                 permission.getId(),
                 permission.getUser().getId(),
-                permission.getUser().getEmail(),
                 permission.getUser().getName(),
-                permission.getRole()
+                permission.getUser().getEmail(),
+                permission.getRole(),
+                permission.getExpiresAt()
         ));
     }
 
@@ -192,10 +195,10 @@ public class WorkspaceController {
 
     @GetMapping("/{id}/recent-files")
     public ResponseEntity<List<DocumentResponse>> getRecentFiles(@PathVariable Long id, Authentication authentication) {
-        List<DocumentResponse> response = workspaceService.getWorkspaceRecentFiles(id, authentication.getName())
-                .stream()
-                .map(DocumentResponse::from)
-                .collect(Collectors.toList());
+        List<com.example.syncpad.entity.Document> docs = workspaceService.getWorkspaceRecentFiles(id, authentication.getName());
+        List<DocumentResponse> response = docs.stream()
+                .map(d -> DocumentResponse.from(d, false))
+                .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(response);
     }
 

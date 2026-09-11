@@ -28,14 +28,20 @@ public class DocumentResponse {
     @JsonProperty("isStarred")
     private boolean isStarred;
 
+    private com.example.syncpad.entity.Role currentUserRole;
+
     public DocumentResponse() {
     }
 
     public static DocumentResponse from(Document doc) {
-        return from(doc, false);
+        return from(doc, false, null);
     }
 
     public static DocumentResponse from(Document doc, boolean isStarred) {
+        return from(doc, isStarred, null);
+    }
+
+    public static DocumentResponse from(Document doc, boolean isStarred, com.example.syncpad.entity.Role currentUserRole) {
         if (doc == null) return null;
         DocumentResponse resp = new DocumentResponse();
         resp.setId(doc.getId());
@@ -57,6 +63,7 @@ public class DocumentResponse {
             resp.setTags(doc.getTags().stream().map(TagResponse::from).collect(java.util.stream.Collectors.toList()));
         }
         resp.setStarred(isStarred);
+        resp.setCurrentUserRole(currentUserRole);
         return resp;
     }
 
@@ -113,4 +120,7 @@ public class DocumentResponse {
 
     @JsonProperty("isStarred")
     public void setStarred(boolean starred) { isStarred = starred; }
+
+    public com.example.syncpad.entity.Role getCurrentUserRole() { return currentUserRole; }
+    public void setCurrentUserRole(com.example.syncpad.entity.Role currentUserRole) { this.currentUserRole = currentUserRole; }
 }

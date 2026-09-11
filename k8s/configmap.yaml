@@ -19,5 +19,6 @@ data:
   RABBITMQ_USER: "syncpad"
   ALLOWED_ORIGINS: "https://syncpad.yourdomain.com,https://localhost"
   JWT_EXPIRATION: "86400000"
+  GEMINI_MODEL: "gemini-flash-lite-latest"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"

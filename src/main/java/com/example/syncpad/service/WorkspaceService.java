@@ -1,5 +1,6 @@
 package com.example.syncpad.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,8 @@ public class WorkspaceService {
     private final SimpMessagingTemplate messagingTemplate;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final com.example.syncpad.repository.UserFavoriteRepository userFavoriteRepository;
+    private final com.example.syncpad.repository.AuditLogRepository auditLogRepository;
 
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
@@ -58,7 +61,9 @@ public class WorkspaceService {
             SimpMessagingTemplate messagingTemplate,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
             @org.springframework.context.annotation.Lazy AuditLogService auditLogService,
-            @org.springframework.context.annotation.Lazy WebhookService webhookService
+            @org.springframework.context.annotation.Lazy WebhookService webhookService,
+            @org.springframework.context.annotation.Lazy com.example.syncpad.repository.UserFavoriteRepository userFavoriteRepository,
+            @org.springframework.context.annotation.Lazy com.example.syncpad.repository.AuditLogRepository auditLogRepository
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -75,6 +80,8 @@ public class WorkspaceService {
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
         this.webhookService = webhookService;
+        this.userFavoriteRepository = userFavoriteRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     private final WebhookService webhookService;
@@ -90,8 +97,8 @@ public class WorkspaceService {
     }
 
     private void validateMemberRole(Role role) {
-        if (role != Role.EDITOR && role != Role.VIEWER && role != Role.COMMENTER) {
-            throw new IllegalArgumentException("Workspace members can only be assigned EDITOR, COMMENTER, or VIEWER roles");
+        if (role != Role.ADMIN && role != Role.EDITOR && role != Role.VIEWER && role != Role.COMMENTER) {
+            throw new IllegalArgumentException("Workspace members can only be assigned ADMIN, EDITOR, COMMENTER, or VIEWER roles");
         }
     }
 
@@ -100,12 +107,14 @@ public class WorkspaceService {
         User owner = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
 
-        String initial = (name != null && name.length() > 0) ? name.substring(0, 1).toUpperCase() : "W";
-        Workspace workspace = new Workspace(name, description, color, initial, owner);
+        String trimmedName = (name != null) ? name.trim() : "";
+        String initial = (!trimmedName.isEmpty()) ? trimmedName.substring(0, 1).toUpperCase() : "W";
+        Workspace workspace = new Workspace(trimmedName, description, color, initial, owner);
         workspace.setCurrentUserRole(Role.OWNER);
         Workspace savedWorkspace = workspaceRepository.saveAndFlush(workspace);
 
         WorkspacePermission ownerPermission = new WorkspacePermission(savedWorkspace, owner, Role.OWNER);
+        workspacePermissionRepository.save(ownerPermission);
 
         savedWorkspace.setCurrentUserRole(Role.OWNER);
         if (auditLogService != null) {
@@ -182,8 +191,22 @@ public class WorkspaceService {
         }
 
         if (name != null && !name.isBlank()) {
-            workspace.setName(name);
-            workspace.setInitial(name.substring(0, 1).toUpperCase());
+            String oldName = workspace.getName();
+            String newName = name.trim();
+            if (!oldName.equalsIgnoreCase(newName)) {
+                List<com.example.syncpad.entity.Document> docs = documentRepository.findByWorkspaceName(oldName);
+                for (com.example.syncpad.entity.Document d : docs) {
+                    d.setWorkspaceName(newName);
+                    documentRepository.save(d);
+                }
+                List<com.example.syncpad.entity.Folder> folders = folderRepository.findByWorkspaceName(oldName);
+                for (com.example.syncpad.entity.Folder f : folders) {
+                    f.setWorkspaceName(newName);
+                    folderRepository.save(f);
+                }
+            }
+            workspace.setName(newName);
+            workspace.setInitial(newName.substring(0, 1).toUpperCase());
         }
         if (description != null) workspace.setDescription(description);
         if (color != null) workspace.setColor(color);
@@ -205,9 +228,21 @@ public class WorkspaceService {
             throw new PermissionDeniedException("Only Workspace Admin can delete this workspace");
         }
 
+        // 0. Cascade delete audit logs belonging to this workspace
+        if (auditLogRepository != null) {
+            auditLogRepository.deleteByWorkspace(workspace);
+        }
+
         // 1. Cascade delete all documents belonging to this workspace
         List<com.example.syncpad.entity.Document> workspaceDocs = documentRepository.findByWorkspaceName(workspace.getName());
         for (com.example.syncpad.entity.Document doc : workspaceDocs) {
+            if (userFavoriteRepository != null) {
+                userFavoriteRepository.deleteByDocument(doc);
+            }
+            if (doc.getTags() != null) {
+                doc.getTags().clear();
+                documentRepository.save(doc);
+            }
             documentVersionRepository.findByDocumentOrderByVersionNumberDesc(doc).forEach(documentVersionRepository::delete);
             documentPermissionRepository.findByDocument(doc).forEach(documentPermissionRepository::delete);
             shareLinkRepository.deleteByDocument(doc);
@@ -217,6 +252,10 @@ public class WorkspaceService {
 
         // 2. Cascade delete all folders belonging to this workspace
         List<com.example.syncpad.entity.Folder> folders = folderRepository.findByWorkspaceName(workspace.getName());
+        for (com.example.syncpad.entity.Folder folder : folders) {
+            folder.setParentFolder(null);
+            folderRepository.save(folder);
+        }
         for (com.example.syncpad.entity.Folder folder : folders) {
             folderPermissionRepository.deleteByFolder(folder);
             folderRepository.delete(folder);
@@ -274,7 +313,13 @@ public class WorkspaceService {
             throw new PermissionDeniedException("Access restricted: You do not have permission to view members of this workspace");
         }
 
-        return workspacePermissionRepository.findByWorkspace(workspace);
+        List<WorkspacePermission> list = new ArrayList<>(workspacePermissionRepository.findByWorkspace(workspace));
+        boolean ownerIncluded = list.stream().anyMatch(p -> p.getUser() != null && workspace.getOwner() != null && p.getUser().getId().equals(workspace.getOwner().getId()));
+        if (!ownerIncluded && workspace.getOwner() != null) {
+            WorkspacePermission op = new WorkspacePermission(workspace, workspace.getOwner(), Role.OWNER);
+            list.add(0, op);
+        }
+        return list;
     }
 
     @Transactional
@@ -358,7 +403,10 @@ public class WorkspaceService {
             Notification savedNotification = notificationRepository.save(notification);
 
             try {
-                messagingTemplate.convertAndSend("/topic/notifications/" + member.getEmail(), NotificationResponse.fromEntity(savedNotification));
+                messagingTemplate.convertAndSend("/topic/notifications." + member.getEmail(), NotificationResponse.fromEntity(savedNotification));
+                if (member.getId() != null) {
+                    messagingTemplate.convertAndSend("/topic/users." + member.getId() + ".notifications", NotificationResponse.fromEntity(savedNotification));
+                }
             } catch (Exception e) {
                 // WebSocket push optional
             }

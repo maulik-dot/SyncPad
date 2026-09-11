@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="syncpadGrad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4338ca" />
+    </linearGradient>
+    <filter id="shadow512" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <!-- Rounded App Background -->
+  <rect width="512" height="512" rx="112" fill="url(#syncpadGrad512)" />
+  <!-- Notepad Document Body -->
+  <g filter="url(#shadow512)">
+    <rect x="112" y="96" width="288" height="320" rx="36" fill="#ffffff" />
+    <!-- Header Accent Bar -->
+    <rect x="112" y="96" width="288" height="64" rx="36" fill="#e0e7ff" />
+    <!-- Sync / Lightning Bolt Icon -->
+    <path d="M256 190 L224 250 L250 250 L246 314 L288 260 L262 260 Z" fill="#4f46e5" />
+    <!-- Text Lines -->
+    <rect x="156" y="336" width="200" height="16" rx="8" fill="#cbd5e1" />
+    <rect x="156" y="364" width="130" height="16" rx="8" fill="#e2e8f0" />
+  </g>
+</svg>
+

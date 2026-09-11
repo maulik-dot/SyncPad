@@ -76,9 +76,11 @@ export const documentService = {
   },
 
   async shareDocument(id: number | string, email: string, role: Role): Promise<any> {
+  async shareDocument(id: number | string, email: string, role: Role, durationHours?: number | null): Promise<any> {
     return apiFetch<any>(`/documents/${id}/share`, {
       method: 'POST',
       body: JSON.stringify({ email, role })
+      body: JSON.stringify({ email, role, durationHours: durationHours && durationHours > 0 ? durationHours : null })
     })
   },
 
@@ -86,6 +88,26 @@ export const documentService = {
     return apiFetch<any>(`/documents/${id}/share-link`, {
       method: 'POST',
       body: JSON.stringify({ role, expiresInDays })
+    })
+  },
+
+  async getActiveShareLink(id: number | string): Promise<any> {
+    return apiFetch<any>(`/documents/${id}/share-link`)
+  },
+
+  async revokeShareLink(token: string): Promise<void> {
+    return apiFetch<void>(`/documents/share-link/${encodeURIComponent(token)}/revoke`, {
+      method: 'POST'
+    })
+  },
+
+  async getDocumentPermissions(id: number | string): Promise<any[]> {
+    return apiFetch<any[]>(`/documents/${id}/permissions`)
+  },
+
+  async removeDocumentPermission(id: number | string, userId: number | string): Promise<void> {
+    return apiFetch<void>(`/documents/${id}/permissions/${userId}`, {
+      method: 'DELETE'
     })
   },
 

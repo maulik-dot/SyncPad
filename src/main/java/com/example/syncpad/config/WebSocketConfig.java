@@ -50,7 +50,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         this.userRepository = userRepository;
     }
 
-    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8443,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8082,http://127.0.0.1:8443}")
+    @Value("${app.cors.allowed-origins:https://localhost,https://127.0.0.1,https://localhost:8443,http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8083,http://localhost:8443,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8082,http://127.0.0.1:8083,http://127.0.0.1:8443}")
     private String allowedOrigins;
 
     @Value("${spring.websocket.relay.enabled:false}")
@@ -154,22 +154,29 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         if (!targetUser.equalsIgnoreCase(user.getName())) {
                             throw new AccessDeniedException("Cannot subscribe to notifications for another user");
                         }
-                    } else if (destination != null && (destination.startsWith("/topic/users.") || destination.startsWith("/topic/users/"))) {
-                        String suffix = destination.startsWith("/topic/users.")
-                                ? destination.substring("/topic/users.".length())
-                                : destination.substring("/topic/users/".length());
-                        String targetUserIdStr = suffix.split("[/.]", 2)[0];
-                        try {
-                            Long targetUserId = Long.valueOf(targetUserIdStr);
-                            com.example.syncpad.entity.User authUser = userRepository.findByEmail(user.getName())
-                                    .orElseThrow(() -> new AccessDeniedException("User not found"));
-                            if (!authUser.getId().equals(targetUserId)) {
-                                throw new AccessDeniedException("Cannot subscribe to notifications for another user ID");
+                    } else if (destination != null && (destination.startsWith("/topic/notifications.") || destination.startsWith("/topic/users.") || destination.startsWith("/topic/users/"))) {
+                        if (destination.startsWith("/topic/notifications.")) {
+                            String targetUser = destination.substring("/topic/notifications.".length());
+                            if (!targetUser.equalsIgnoreCase(user.getName())) {
+                                throw new AccessDeniedException("Cannot subscribe to notifications for another user");
                             }
-                        } catch (AccessDeniedException ade) {
-                            throw ade;
-                        } catch (Exception e) {
-                            throw new AccessDeniedException("Invalid user notification destination: " + destination, e);
+                        } else {
+                            String suffix = destination.startsWith("/topic/users.")
+                                    ? destination.substring("/topic/users.".length())
+                                    : destination.substring("/topic/users/".length());
+                            String targetUserIdStr = suffix.split("[/.]", 2)[0];
+                            try {
+                                Long targetUserId = Long.valueOf(targetUserIdStr);
+                                com.example.syncpad.entity.User authUser = userRepository.findByEmail(user.getName())
+                                        .orElseThrow(() -> new AccessDeniedException("User not found"));
+                                if (!authUser.getId().equals(targetUserId)) {
+                                    throw new AccessDeniedException("Cannot subscribe to notifications for another user ID");
+                                }
+                            } catch (AccessDeniedException ade) {
+                                throw ade;
+                            } catch (Exception e) {
+                                throw new AccessDeniedException("Invalid user notification destination: " + destination, e);
+                            }
                         }
                     } else if (destination != null && (destination.startsWith("/topic/documents/") || destination.startsWith("/topic/documents."))) {
                         String suffix = destination.startsWith("/topic/documents/")
@@ -198,12 +205,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     }
                     String documentIdStr = parts[0];
                     String action = parts[1];
-                    if (!action.equals("edit") && !action.equals("save") && !action.equals("pdf-annotation") && !action.equals("crdt") && !action.equals("presence")) {
+                    if (!action.equals("edit") && !action.equals("save") && !action.equals("pdf-annotation") && !action.equals("crdt") && !action.equals("presence") && !action.equals("mention")) {
                         throw new AccessDeniedException("Unsupported document SEND action: " + action);
                     }
                     try {
                         Long documentId = Long.valueOf(documentIdStr);
-                        documentService.assertCanEditDocument(documentId, user.getName());
+                        if ("presence".equals(action)) {
+                            documentService.getDocument(documentId, user.getName());
+                        } else {
+                            documentService.assertCanEditDocument(documentId, user.getName());
+                        }
                     } catch (AccessDeniedException ade) {
                         throw ade;
                     } catch (Exception e) {

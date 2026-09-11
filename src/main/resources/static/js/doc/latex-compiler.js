@@ -991,6 +991,13 @@ class SyncPadLatexEngine {
                 renderedMath.style.fontSize = `${currentRem}rem`;
                 card.setAttribute('data-latex-size', `${currentRem}rem`);
 
+                if (typeof window.broadcastDocumentEdit === 'function') {
+                    window.broadcastDocumentEdit(
+                        document.getElementById('docPageSheet')?.innerHTML || '',
+                        window.currentDoc?.title || ''
+                    );
+                }
+
                 const percent = Math.round((currentRem / 1.2) * 100);
                 tooltip.textContent = `Scale: ${percent}% • ${currentRem}rem`;
                 tooltip.style.left = `${moveEv.clientX + 14}px`;
@@ -1072,6 +1079,13 @@ class SyncPadLatexEngine {
                 card.style.top = `${boundedTop}px`;
                 card.setAttribute('data-latex-x', boundedLeft);
                 card.setAttribute('data-latex-y', boundedTop);
+
+                if (typeof window.broadcastDocumentEdit === 'function') {
+                    window.broadcastDocumentEdit(
+                        document.getElementById('docPageSheet')?.innerHTML || '',
+                        window.currentDoc?.title || ''
+                    );
+                }
             };
 
             const onMouseUp = () => {
@@ -1106,3 +1120,4 @@ class SyncPadLatexEngine {
 
 // Global Singleton
 window.latexEngine = new SyncPadLatexEngine();
+console.log('[ latex-compiler ] SyncPadLatexEngine initialized', !!window.latexEngine, 'katex:', typeof window.katex);

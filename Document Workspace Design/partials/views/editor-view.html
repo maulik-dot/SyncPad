@@ -1,0 +1,969 @@
+                <div id="editorView" class="hidden" style="flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg-app); position: relative;">
+                    
+                    <header class="doc-top-bar" style="position: relative; overflow: visible;">
+                        <!-- Left Controls -->
+                        <div style="display: flex; align-items: center; gap: 0.55rem; min-width: 0; flex-shrink: 1;">
+                            <button class="btn btn-icon" onclick="closeEditorView()" title="Back to Dashboard (Esc)" aria-label="Back" style="flex-shrink: 0;">
+                                <i data-lucide="arrow-left" style="width:18px;height:18px;"></i>
+                            </button>
+                            
+                            <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--icon-doc-bg); color: var(--icon-doc-color); flex-shrink: 0;">
+                                <i data-lucide="file-text" style="width: 15px; height: 15px;"></i>
+                            </div>
+
+                            <input type="text" id="docTitleInput" class="doc-title-input" value="System Architecture & Real-Time Sync Engine" oninput="onDocTitleChange(this.value)" onblur="onDocTitleBlur(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}" title="Click to rename document" style="min-width: 120px;">
+
+                            <!-- Star/Favorite button -->
+                            <button class="btn btn-icon" id="editorStarBtn" onclick="toggleCurrentDocStar()" title="Toggle Star / Favorite" aria-label="Star" style="flex-shrink: 0;">
+                                <i data-lucide="star" id="editorStarIcon" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                            </button>
+
+                            <!-- Tags button -->
+                            <button class="btn btn-icon" id="editorTagsBtn" onclick="openCurrentDocTagModal()" title="Manage Document Tags" aria-label="Tags" style="flex-shrink: 0;">
+                                <i data-lucide="tag" style="width:15px;height:15px;"></i>
+                            </button>
+
+                            <!-- Autosave status pill -->
+                            <span id="docSavePill" class="doc-save-pill saved" title="Changes are automatically saved to cloud" style="flex-shrink: 0; white-space: nowrap;">
+                                <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i>
+                                <span id="docSaveText">Saved</span>
+                            </span>
+                        </div>
+
+                        <!-- Right Actions -->
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+                            <!-- Live Collaboration Presence Avatars -->
+                            <div class="avatar-group" id="docCollaboratorsAvatarGroup" style="margin-right: 0.15rem;" title="Active collaborators in this document">
+                                <div class="avatar-presence" style="background: #2563eb;" title="You (Active)">
+                                    Y
+                                    <span class="presence-dot"></span>
+                                </div>
+                            </div>
+
+                            <div class="toolbar-divider" style="height: 20px;"></div>
+
+                            <!-- PDF Reference Toggle Button (compact) -->
+                            <button class="btn btn-outline" id="pdfToggleBtn" onclick="togglePdfPanel()" style="padding: 0.3rem 0.55rem; height: 30px; font-size: 0.75rem; gap: 0.35rem;" title="Toggle Reference PDF Split Viewer">
+                                <i data-lucide="book-open" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                <span id="pdfToggleBtnText">PDF</span>
+                            </button>
+
+                            <!-- Layout Switcher Button -->
+                            <button class="btn btn-icon" id="layoutSwitcherBtn" onclick="toggleLayoutSwitcher(event)" title="Switch Workspace Layout" aria-label="Layout">
+                                <i data-lucide="layout-grid" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <!-- Document Outline Button -->
+                            <button class="btn btn-icon" id="docOutlineBtn" onclick="toggleDocOutline()" title="Document Outline (Headings)" aria-label="Outline">
+                                <i data-lucide="align-left" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <!-- Document Search Button -->
+                            <button class="btn btn-icon" onclick="toggleDocSearch()" title="Find and Replace (Cmd+F)" aria-label="Search">
+                                <i data-lucide="search" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <div class="toolbar-divider" style="height: 20px;"></div>
+
+                            <!-- Comments Toggle -->
+                            <button class="btn btn-icon" onclick="toggleCommentsSidebar()" title="Comments & Discussions" aria-label="Comments" style="position: relative;">
+                                <i data-lucide="message-square" style="width:16px;height:16px;"></i>
+                                <span id="docCommentsBadge" class="header-notif-badge hidden" style="top: -2px; right: -2px;">0</span>
+                            </button>
+
+                            <!-- Version History -->
+                            <button class="btn btn-icon" onclick="toggleHistoryPanel()" title="Version History" aria-label="History">
+                                <i data-lucide="history" style="width:16px;height:16px;"></i>
+                            </button>
+
+                             <!-- Activity & Audit Trail -->
+                            <button class="btn btn-icon" onclick="toggleActivitySidebar()" title="Activity & Audit Trail" aria-label="Activity">
+                                <i data-lucide="activity" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <!-- Document Info -->
+                            <button class="btn btn-icon" onclick="openDocInfoModal()" title="Document Details & Statistics" aria-label="Info">
+                                <i data-lucide="info" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <!-- Webhooks & Integrations -->
+                            <button class="btn btn-icon" onclick="openWebhooksModal()" title="Webhooks & Integrations" aria-label="Webhooks">
+                                <i data-lucide="webhook" style="width:16px;height:16px;"></i>
+                            </button>
+
+                            <!-- Templates Blueprint Gallery -->
+                            <button class="btn btn-outline" onclick="openTemplatesModal()" style="height: 30px; padding: 0.3rem 0.55rem; font-size: 0.75rem; gap: 0.3rem;" title="Document Templates">
+                                <i data-lucide="layout-template" style="width:13px;height:13px;"></i>
+                                <span>Templates</span>
+                            </button>
+
+                            <!-- Export Document Menu -->
+                            <div style="position: relative; z-index: 1500;">
+                                <button class="btn btn-outline" id="docExportBtn" onclick="toggleExportDropdown(event)" style="height: 30px; padding: 0.3rem 0.55rem; font-size: 0.75rem; gap: 0.3rem;" title="Export Document">
+                                    <i data-lucide="download" style="width:13px;height:13px;"></i>
+                                    <span>Export</span>
+                                </button>
+                                <div id="docExportMenu" class="doc-floating-menu hidden" style="top: 36px; right: 0; width: 235px; z-index: 1500;">
+                                    <button class="doc-menu-item" onclick="openExportPreview('pdf')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="eye" style="width:14px;height:14px;color:var(--accent-primary);"></i> Preview Export...</span></button>
+                                    <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+                                    <div style="padding: 4px 12px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Quick Formats</div>
+                                    <button class="doc-menu-item" onclick="downloadServerExport('md')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-code" style="width:14px;height:14px;color:#10b981;"></i> Markdown (.md)</span></button>
+                                    <button class="doc-menu-item" onclick="downloadServerExport('html')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="code" style="width:14px;height:14px;color:#f59e0b;"></i> Web Page (.html)</span></button>
+                                    <button class="doc-menu-item" onclick="downloadServerExport('txt')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-text" style="width:14px;height:14px;color:#64748b;"></i> Plain Text (.txt)</span></button>
+                                    <button class="doc-menu-item" onclick="downloadServerExport('json')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="box" style="width:14px;height:14px;color:#6366f1;"></i> Document Bundle (.json)</span></button>
+                                    <button class="doc-menu-item" onclick="downloadServerExport('zip')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="archive" style="width:14px;height:14px;color:#8b5cf6;"></i> Archive Bundle (.zip)</span></button>
+                                    <div style="height: 1px; background: var(--border-color); margin: 4px 0;"></div>
+                                    <div style="padding: 4px 12px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Rich Renderers</div>
+                                    <button class="doc-menu-item" onclick="exportDoc('pdf')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-down" style="width:14px;height:14px;color:var(--accent-primary);"></i> PDF Document (.pdf)</span></button>
+                                    <button class="doc-menu-item" onclick="exportDoc('docx')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="file-text" style="width:14px;height:14px;color:#2563eb;"></i> Word Document (.docx)</span></button>
+                                </div>
+                            </div>
+
+                            <!-- Share Button -->
+                            <button class="btn btn-primary" onclick="openDocShareModal()" style="height: 30px; padding: 0.3rem 0.65rem; font-size: 0.78rem; flex-shrink: 0;" title="Collaborator Permissions & Share Links">
+                                <i data-lucide="share-2" style="width:14px;height:14px;"></i>
+                                <span>Share</span>
+                            </button>
+                        </div>
+                    </header>
+
+                    <!-- 2. RICH TEXT FORMATTING TOOLBAR -->
+                    <div class="doc-toolbar" id="docToolbar">
+                        <!-- History: Undo / Redo -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon" onclick="formatDocAction('undo')" title="Undo (Cmd+Z)"><i data-lucide="undo" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" onclick="formatDocAction('redo')" title="Redo (Cmd+Shift+Z)"><i data-lucide="redo" style="width:15px;height:15px;"></i></button>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Text Style Dropdown -->
+                        <div style="position: relative;">
+                            <button class="doc-dropdown-btn" id="styleDropdownBtn" onclick="toggleStyleDropdown(event)" title="Text Styles">
+                                <span id="currentStyleLabel">Heading 1</span>
+                                <i data-lucide="chevron-down" style="width:13px;height:13px;color:var(--text-muted);"></i>
+                            </button>
+                            <div id="styleDropdownMenu" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 170px;">
+                                <button class="doc-menu-item" onclick="selectTextStyle('p', 'Normal text')"><span style="font-size: 0.88rem;">Normal text</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘0</span></button>
+                                <button class="doc-menu-item active" onclick="selectTextStyle('h1', 'Heading 1')"><span style="font-size: 1.15rem; font-weight: 700;">Heading 1</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘1</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('h2', 'Heading 2')"><span style="font-size: 1rem; font-weight: 600;">Heading 2</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘2</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('h3', 'Heading 3')"><span style="font-size: 0.9rem; font-weight: 600;">Heading 3</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘3</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('quote', 'Blockquote')"><span style="font-style: italic; border-left: 2px solid var(--accent-primary); padding-left: 4px;">Quote</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('code', 'Code Block')"><span style="font-family: monospace; background: var(--bg-hover); padding: 1px 4px; border-radius: 3px;">Code block</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('callout', 'Callout')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="info" style="width:14px;height:14px;color:var(--accent-primary);"></i> Callout box</span></button>
+                                <button class="doc-menu-item" onclick="selectTextStyle('latex', 'LaTeX Equation')"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-family: 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">L<sup>A</sup>T<sub>E</sub>X</span> LaTeX style</span><span style="font-size: 0.72rem; color: var(--text-muted);">⌘M</span></button>
+                                <button class="doc-menu-item" onclick="console.log('Format All Math clicked, latexEngine:', !!window.latexEngine); if(window.latexEngine && window.latexEngine.compileAllMathInDocument){window.latexEngine.compileAllMathInDocument();}else{if(typeof toast==='function')toast('LaTeX engine not loaded — hard refresh (Ctrl+Shift+R)','error');}const m=document.getElementById('styleDropdownMenu');if(m)m.classList.add('hidden');" title="Scan and compile all $inline$ and $$block$$ math equations in document"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">∑</span> Format All Math ($)</span></button>
+                            </div>
+                        </div>
+
+                        <!-- Font Family Dropdown -->
+                        <div style="position: relative;">
+                            <button class="doc-dropdown-btn" id="fontDropdownBtn" onclick="toggleFontDropdown(event)" title="Font Family">
+                                <span id="currentFontLabel" style="font-family: 'Inter', sans-serif;">Inter</span>
+                                <i data-lucide="chevron-down" style="width:13px;height:13px;color:var(--text-muted);"></i>
+                            </button>
+                            <div id="fontDropdownMenu" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 190px;">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); padding: 0.25rem 0.5rem; text-transform: uppercase;">Sans-Serif</div>
+                                <button class="doc-menu-item active" onclick="selectFontFamily('Inter, sans-serif', 'Inter')"><span style="font-family: 'Inter', sans-serif;">Inter</span><i data-lucide="check" style="width:13px;height:13px;"></i></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Arial, sans-serif', 'Arial')"><span style="font-family: Arial, sans-serif;">Arial</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Helvetica, sans-serif', 'Helvetica')"><span style="font-family: Helvetica, sans-serif;">Helvetica</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Roboto, sans-serif', 'Roboto')"><span style="font-family: Roboto, sans-serif;">Roboto</span></button>
+                                
+                                <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); padding: 0.35rem 0.5rem 0.25rem; text-transform: uppercase; border-top: 1px solid var(--border-color); margin-top: 0.2rem;">Serif</div>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Georgia, serif', 'Georgia')"><span style="font-family: Georgia, serif;">Georgia</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Times New Roman, serif', 'Times New Roman')"><span style="font-family: 'Times New Roman', serif;">Times New Roman</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Merriweather, serif', 'Merriweather')"><span style="font-family: 'Merriweather', serif;">Merriweather</span></button>
+
+                                <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); padding: 0.35rem 0.5rem 0.25rem; text-transform: uppercase; border-top: 1px solid var(--border-color); margin-top: 0.2rem;">Monospace</div>
+                                <button class="doc-menu-item" onclick="selectFontFamily('JetBrains Mono, monospace', 'JetBrains Mono')"><span style="font-family: 'JetBrains Mono', monospace;">JetBrains Mono</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Fira Code, monospace', 'Fira Code')"><span style="font-family: 'Fira Code', monospace;">Fira Code</span></button>
+                                <button class="doc-menu-item" onclick="selectFontFamily('Courier New, monospace', 'Courier New')"><span style="font-family: 'Courier New', monospace;">Courier New</span></button>
+                            </div>
+                        </div>
+
+                        <!-- Font Size Selector -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon" onclick="adjustFontSize(-1)" title="Decrease font size (Cmd+Shift+,)" style="font-size: 0.78rem; font-weight: 600;">A−</button>
+                            <div style="position: relative;">
+                                <button class="doc-dropdown-btn" id="fontSizeDropdownBtn" onclick="toggleFontSizeDropdown(event)" title="Font Size" style="min-width: 50px; justify-content: space-between; padding: 0.3rem 0.45rem;">
+                                    <span id="currentFontSizeLabel">16</span>
+                                    <i data-lucide="chevron-down" style="width:12px;height:12px;color:var(--text-muted);"></i>
+                                </button>
+                                <div id="fontSizeDropdownMenu" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 85px; max-height: 240px; overflow-y: auto;">
+                                    <button class="doc-menu-item" onclick="selectFontSize(8)"><span>8</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(9)"><span>9</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(10)"><span>10</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(11)"><span>11</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(12)"><span>12</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(14)"><span>14</span></button>
+                                    <button class="doc-menu-item active" onclick="selectFontSize(16)"><span>16</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(18)"><span>18</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(20)"><span>20</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(24)"><span>24</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(28)"><span>28</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(32)"><span>32</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(36)"><span>36</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(48)"><span>48</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(64)"><span>64</span></button>
+                                    <button class="doc-menu-item" onclick="selectFontSize(72)"><span>72</span></button>
+                                </div>
+                            </div>
+                            <button class="btn btn-icon" onclick="adjustFontSize(1)" title="Increase font size (Cmd+Shift+.)" style="font-size: 0.78rem; font-weight: 600;">A+</button>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Inline Formatting -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon" id="boldBtn" onclick="toggleFormat('bold')" title="Bold (Cmd+B)"><i data-lucide="bold" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="italicBtn" onclick="toggleFormat('italic')" title="Italic (Cmd+I)"><i data-lucide="italic" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="underlineBtn" onclick="toggleFormat('underline')" title="Underline (Cmd+U)"><i data-lucide="underline" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="strikeBtn" onclick="toggleFormat('strikethrough')" title="Strikethrough (Cmd+Shift+X)"><i data-lucide="strikethrough" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="codeInlineBtn" onclick="toggleFormat('code')" title="Inline Code (Cmd+E)"><i data-lucide="code" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="subBtn" onclick="toggleFormat('subscript')" title="Subscript" style="font-size: 0.75rem; font-weight: 700;">x₂</button>
+                            <button class="btn btn-icon" id="supBtn" onclick="toggleFormat('superscript')" title="Superscript" style="font-size: 0.75rem; font-weight: 700;">x²</button>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Text Color & Highlight Color -->
+                        <div class="doc-tool-group">
+                            <div style="position: relative;">
+                                <button class="btn btn-icon" id="textColorBtn" onclick="toggleColorPicker('text', event)" title="Text Color" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+                                    <span style="font-size: 0.85rem; font-weight: 800;">A</span>
+                                    <span id="textColorIndicator" style="width: 14px; height: 3px; background: var(--text-primary); border-radius: 1px;"></span>
+                                </button>
+                                <div id="textColorPicker" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 220px; max-height: 320px; overflow-y: auto;">
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem;">Solid Colors</div>
+                                    <div class="color-swatch-grid">
+                                        <button class="color-swatch-btn" style="background: #0f172a;" onclick="applyColor('text', '#0f172a')" title="Black"></button>
+                                        <button class="color-swatch-btn" style="background: #475569;" onclick="applyColor('text', '#475569')" title="Slate"></button>
+                                        <button class="color-swatch-btn" style="background: #2563eb;" onclick="applyColor('text', '#2563eb')" title="Blue"></button>
+                                        <button class="color-swatch-btn" style="background: #7c3aed;" onclick="applyColor('text', '#7c3aed')" title="Violet"></button>
+                                        <button class="color-swatch-btn" style="background: #db2777;" onclick="applyColor('text', '#db2777')" title="Pink"></button>
+                                        <button class="color-swatch-btn" style="background: #dc2626;" onclick="applyColor('text', '#dc2626')" title="Red"></button>
+                                        <button class="color-swatch-btn" style="background: #d97706;" onclick="applyColor('text', '#d97706')" title="Amber"></button>
+                                        <button class="color-swatch-btn" style="background: #059669;" onclick="applyColor('text', '#059669')" title="Emerald"></button>
+                                        <button class="color-swatch-btn" style="background: #0891b2;" onclick="applyColor('text', '#0891b2')" title="Cyan"></button>
+                                        <button class="color-swatch-btn" style="background: #4f46e5;" onclick="applyColor('text', '#4f46e5')" title="Indigo"></button>
+                                        <button class="color-swatch-btn" style="background: #9333ea;" onclick="applyColor('text', '#9333ea')" title="Purple"></button>
+                                        <button class="color-swatch-btn" style="background: #64748b;" onclick="applyColor('text', '#64748b')" title="Gray"></button>
+                                    </div>
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.6rem 0.4rem 0.2rem; border-top: 1px solid var(--border-color); margin-top: 0.5rem;">Gradients</div>
+                                    <div class="color-swatch-grid">
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff7e5f, #feb47b);" onclick="applyColor('text', 'linear-gradient(90deg, #ff7e5f, #feb47b)')" title="Sunset"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #2193b0, #6dd5ed);" onclick="applyColor('text', 'linear-gradient(90deg, #2193b0, #6dd5ed)')" title="Ocean"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #11998e, #38ef7d);" onclick="applyColor('text', 'linear-gradient(90deg, #11998e, #38ef7d)')" title="Forest"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #8e2de2, #4a00e0);" onclick="applyColor('text', 'linear-gradient(90deg, #8e2de2, #4a00e0)')" title="Purple Dream"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #f12711, #f5af19);" onclick="applyColor('text', 'linear-gradient(90deg, #f12711, #f5af19)')" title="Fire"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #00c9ff, #92fe9d);" onclick="applyColor('text', 'linear-gradient(90deg, #00c9ff, #92fe9d)')" title="Aurora"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #e84393, #e77f67);" onclick="applyColor('text', 'linear-gradient(90deg, #e84393, #e77f67)')" title="Rose"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #4b6cb7, #182848);" onclick="applyColor('text', 'linear-gradient(90deg, #4b6cb7, #182848)')" title="Midnight"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff9a9e, #fecfef, #fecfef);" onclick="applyColor('text', 'linear-gradient(90deg, #ff9a9e, #fecfef)')" title="Blush"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #a1c4fd, #c2e9fb);" onclick="applyColor('text', 'linear-gradient(90deg, #a1c4fd, #c2e9fb)')" title="Sky"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #f6d365, #fda085);" onclick="applyColor('text', 'linear-gradient(90deg, #f6d365, #fda085)')" title="Peach"></button>
+                                        <button class="color-swatch-btn" style="background: linear-gradient(90deg, #ff8177, #ff867a, #ff8c7f);" onclick="applyColor('text', 'linear-gradient(90deg, #ff8177, #ff867a)')" title="Coral"></button>
+                                    </div>
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.6rem 0.4rem 0.2rem; border-top: 1px solid var(--border-color); margin-top: 0.5rem;">Custom (any hex)</div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem;">
+                                        <input type="color" id="customTextColorInput" value="#2563eb" style="width: 44px; height: 32px; padding: 2px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; background: var(--bg-surface);" title="Pick any color">
+                                        <input type="text" id="customTextColorHex" placeholder="#2563eb" value="#2563eb" maxlength="7" style="flex: 1; height: 32px; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; padding: 0 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface); color: var(--text-primary);" title="Hex color">
+                                        <button class="btn btn-primary" style="height: 32px; padding: 0 0.75rem; font-size: 0.75rem; font-weight: 600;" onclick="applyCustomTextColor()" title="Apply custom color">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="position: relative;">
+                                <button class="btn btn-icon" id="highlightColorBtn" onclick="toggleColorPicker('highlight', event)" title="Highlight Color" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+                                    <i data-lucide="highlighter" style="width:14px;height:14px;"></i>
+                                    <span id="highlightColorIndicator" style="width: 14px; height: 3px; background: #fef08a; border-radius: 1px;"></span>
+                                </button>
+                                <div id="highlightColorPicker" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 185px;">
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); padding: 0.2rem 0.4rem;">Highlight Color</div>
+                                    <div class="color-swatch-grid">
+                                        <button class="color-swatch-btn" style="background: transparent; border: 1px dashed var(--border-strong);" onclick="applyColor('highlight', 'transparent')" title="None"></button>
+                                        <button class="color-swatch-btn" style="background: #fef08a;" onclick="applyColor('highlight', '#fef08a')" title="Yellow"></button>
+                                        <button class="color-swatch-btn" style="background: #bbf7d0;" onclick="applyColor('highlight', '#bbf7d0')" title="Green"></button>
+                                        <button class="color-swatch-btn" style="background: #bfdbfe;" onclick="applyColor('highlight', '#bfdbfe')" title="Blue"></button>
+                                        <button class="color-swatch-btn" style="background: #fbcfe8;" onclick="applyColor('highlight', '#fbcfe8')" title="Pink"></button>
+                                        <button class="color-swatch-btn" style="background: #fed7aa;" onclick="applyColor('highlight', '#fed7aa')" title="Orange"></button>
+                                        <button class="color-swatch-btn" style="background: #e9d5ff;" onclick="applyColor('highlight', '#e9d5ff')" title="Purple"></button>
+                                        <button class="color-swatch-btn" style="background: #99f6e4;" onclick="applyColor('highlight', '#99f6e4')" title="Teal"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Alignment & Line Spacing -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon active" id="alignLeftBtn" onclick="setTextAlign('left')" title="Align Left (Cmd+Shift+L)"><i data-lucide="align-left" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="alignCenterBtn" onclick="setTextAlign('center')" title="Center (Cmd+Shift+E)"><i data-lucide="align-center" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="alignRightBtn" onclick="setTextAlign('right')" title="Align Right (Cmd+Shift+R)"><i data-lucide="align-right" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" id="alignJustifyBtn" onclick="setTextAlign('justify')" title="Justify (Cmd+Shift+J)"><i data-lucide="align-justify" style="width:15px;height:15px;"></i></button>
+                            
+                            <div style="position: relative;">
+                                <button class="btn btn-icon" id="lineSpacingBtn" onclick="toggleLineSpacing(event)" title="Line & Paragraph Spacing"><i data-lucide="line-height" style="width:15px;height:15px;"></i></button>
+                                <div id="lineSpacingMenu" class="doc-floating-menu hidden" style="top: 36px; left: -60px; width: 190px;">
+                                    <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); padding: 0.25rem 0.5rem; text-transform: uppercase;">Line Spacing</div>
+                                    <button class="doc-menu-item" onclick="setDocLineSpacing('1.0', 'Single')"><span>Single (1.0)</span></button>
+                                    <button class="doc-menu-item" onclick="setDocLineSpacing('1.15', '1.15')"><span>1.15</span></button>
+                                    <button class="doc-menu-item active" onclick="setDocLineSpacing('1.5', '1.5')"><span>1.5 (Default)</span></button>
+                                    <button class="doc-menu-item" onclick="setDocLineSpacing('2.0', 'Double')"><span>Double (2.0)</span></button>
+                                    <div style="border-top: 1px solid var(--border-color); margin: 0.25rem 0;"></div>
+                                    <button class="doc-menu-item" onclick="addDocParagraphSpacing('before')"><span>Add space before paragraph</span></button>
+                                    <button class="doc-menu-item" onclick="addDocParagraphSpacing('after')"><span>Add space after paragraph</span></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Lists & Indentation -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-icon" onclick="insertList('bullet')" title="Bulleted list (Cmd+Shift+8)"><i data-lucide="list" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" onclick="insertList('number')" title="Numbered list (Cmd+Shift+7)"><i data-lucide="list-ordered" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" onclick="insertList('check')" title="Checklist (Cmd+Shift+9)"><i data-lucide="check-square" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" onclick="adjustIndent(-1)" title="Decrease indent (Cmd+[)"><i data-lucide="outdent" style="width:15px;height:15px;"></i></button>
+                            <button class="btn btn-icon" onclick="adjustIndent(1)" title="Increase indent (Cmd+])"><i data-lucide="indent" style="width:15px;height:15px;"></i></button>
+                        </div>
+
+                        <div class="toolbar-divider"></div>
+
+                        <!-- Insert Menu -->
+                        <div style="position: relative;">
+                            <button class="doc-dropdown-btn" id="insertDropdownBtn" onclick="toggleInsertDropdown(event)" title="Insert Structured Content">
+                                <i data-lucide="plus" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                <span>Insert</span>
+                                <i data-lucide="chevron-down" style="width:13px;height:13px;color:var(--text-muted);"></i>
+                            </button>
+                            <div id="insertDropdownMenu" class="doc-floating-menu hidden" style="top: 36px; left: 0; width: 190px;">
+                                <button class="doc-menu-item" onclick="insertElement('link')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="link" style="width:14px;height:14px;"></i> Link</span><span style="font-size: 0.7rem; color: var(--text-muted);">⌘K</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('image')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="image" style="width:14px;height:14px;"></i> Image</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('table')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="table" style="width:14px;height:14px;"></i> Table</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('latex')"><span style="display: flex; align-items: center; gap: 0.5rem;"><span style="font-family: 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.95rem; color: #8b5cf6;">L<sup>A</sup>T<sub>E</sub>X</span> LaTeX Equation</span><span style="font-size: 0.7rem; color: var(--text-muted);">⌘M</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('divider')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="minus" style="width:14px;height:14px;"></i> Divider</span></button>
+                                <button class="doc-menu-item" onclick="insertElement('mention')"><span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="at-sign" style="width:14px;height:14px;"></i> Mention @</span></button>
+                            </div>
+                        </div>
+
+                        <!-- Annotation Overlay Toggle -->
+                        <div class="doc-tool-group">
+                            <button class="btn btn-secondary" id="annotationToggleBtn" onclick="toggleAnnotationMode()" style="height: 30px; padding: 0.25rem 0.65rem; font-size: 0.78rem; gap: 0.4rem;" title="Toggle Document Annotations">
+                                <i data-lucide="pen-tool" style="width:14px;height:14px;"></i>
+                                <span id="annotationBtnText">Annotate</span>
+                            </button>
+                        </div>
+
+                        <!-- AI Document Assistant / Copilot Trigger -->
+                        <div class="doc-tool-group">
+                            <button class="btn doc-ai-btn" id="docAiAssistantBtn" onclick="openAiPalette()" style="height: 30px; padding: 0.25rem 0.75rem; font-size: 0.78rem; gap: 0.4rem;" title="Ask AI / Generate with Gemini (Cmd+J)">
+                                <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                                <span>Ask AI</span>
+                            </button>
+                            <button class="btn btn-secondary" id="copilotDrawerBtn" onclick="toggleAiCopilotDrawer()" style="height: 30px; padding: 0.25rem 0.5rem; font-size: 0.78rem;" title="Toggle AI Copilot Chat">
+                                <i data-lucide="bot" style="width:14px;height:14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. MAIN WORKSPACE CONTAINER -->
+                    <div id="docWorkspaceContainer" class="doc-workspace-container layout-pdf-left">
+                        
+                        <!-- A. DOCUMENT OUTLINE LEFT DRAWER (COLLAPSIBLE) -->
+                        <div id="docOutlineDrawer" class="doc-outline-drawer hidden">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <i data-lucide="list-tree" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                                    <span style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Outline</span>
+                                    <span id="docOutlineCountBadge" style="font-size: 0.65rem; background: var(--bg-hover); color: var(--text-muted); padding: 1px 6px; border-radius: 9999px;">0</span>
+                                </div>
+                                <button class="btn btn-icon" onclick="toggleDocOutline()" style="width: 24px; height: 24px;" title="Collapse Outline"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
+                            </div>
+                            <div id="docOutlineList" style="display: flex; flex-direction: column; gap: 0.2rem; overflow-y: auto; flex: 1;">
+                                <!-- Headings rendered dynamically -->
+                            </div>
+                        </div>
+
+
+                        <!-- B. PDF REFERENCE PANEL (SPLIT WORKSPACE) -->
+                        <div id="pdfReferencePane" class="doc-pdf-pane">
+                            
+                            <!-- PDF Viewer Top Bar -->
+                            <div class="pdf-viewer-header" style="position: relative;">
+                                <!-- PDF Document Switcher & Attachment Dropdown -->
+                                <div style="position: relative;">
+                                    <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none;" onchange="handlePdfFileUpload(event)">
+                                    <button class="btn btn-outline" onclick="togglePdfAttachmentMenu(event)" id="pdfAttachBtn" style="padding: 0.25rem 0.55rem; height: 28px; font-size: 0.72rem; gap: 0.35rem;" title="Attach, upload, or switch reference PDF">
+                                        <i data-lucide="file-up" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                        <span id="pdfFileNameLabel" style="max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">RFC-7629-Architecture.pdf</span>
+                                        <i data-lucide="chevron-down" style="width:12px;height:12px;opacity:0.7;"></i>
+                                    </button>
+
+                                    <!-- PDF Attachment & Presets Dropdown Menu -->
+                                    <div class="doc-dropdown-menu hidden" id="pdfAttachmentMenu" style="position: absolute; top: calc(100% + 4px); left: 0; width: 280px; z-index: 50; box-shadow: var(--shadow-xl); max-height: 480px; overflow-y: auto;">
+                                        <button class="doc-menu-item" onclick="triggerPdfUpload()">
+                                            <i data-lucide="upload" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                            <span>Upload PDF from Computer...</span>
+                                        </button>
+                                        <button class="doc-menu-item" onclick="promptPdfUrl()">
+                                            <i data-lucide="link" style="width:14px;height:14px;"></i>
+                                            <span>Attach PDF from URL...</span>
+                                        </button>
+                                        
+                                        <!-- Dynamic Uploaded PDFs Section -->
+                                        <div id="pdfUploadedSection" class="hidden">
+                                            <div class="dropdown-divider"></div>
+                                            <div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.04em;">My Uploaded PDFs</div>
+                                            <div id="pdfUploadedList"></div>
+                                        </div>
+
+                                        <div class="dropdown-divider"></div>
+                                        <div style="padding: 4px 10px; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Preset Reference Library</div>
+                                        <button class="doc-menu-item pdf-preset-item" data-preset-key="rfc-7629" onclick="loadPresetPdf('rfc-7629')" style="display:flex; align-items:center; justify-content:space-between;">
+                                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                                <i data-lucide="file-text" style="width:14px;height:14px;color:#2563eb;"></i>
+                                                <span>RFC-7629 Architecture Spec</span>
+                                            </div>
+                                            <span class="pdf-preset-active-badge hidden" style="font-size:0.75rem; color:var(--accent-primary); font-weight:700; background:rgba(139,92,246,0.15); padding:1px 6px; border-radius:10px;">✓ Active</span>
+                                        </button>
+                                        <button class="doc-menu-item pdf-preset-item" data-preset-key="distributed-systems" onclick="loadPresetPdf('distributed-systems')" style="display:flex; align-items:center; justify-content:space-between;">
+                                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                                <i data-lucide="layers" style="width:14px;height:14px;color:#9333ea;"></i>
+                                                <span>Distributed Systems & OT Spec</span>
+                                            </div>
+                                            <span class="pdf-preset-active-badge hidden" style="font-size:0.75rem; color:var(--accent-primary); font-weight:700; background:rgba(139,92,246,0.15); padding:1px 6px; border-radius:10px;">✓ Active</span>
+                                        </button>
+                                        <button class="doc-menu-item pdf-preset-item" data-preset-key="postgres-internals" onclick="loadPresetPdf('postgres-internals')" style="display:flex; align-items:center; justify-content:space-between;">
+                                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                                <i data-lucide="database" style="width:14px;height:14px;color:#059669;"></i>
+                                                <span>PostgreSQL Storage Engine</span>
+                                            </div>
+                                            <span class="pdf-preset-active-badge hidden" style="font-size:0.75rem; color:var(--accent-primary); font-weight:700; background:rgba(139,92,246,0.15); padding:1px 6px; border-radius:10px;">✓ Active</span>
+                                        </button>
+                                        <button class="doc-menu-item pdf-preset-item" data-preset-key="design-system" onclick="loadPresetPdf('design-system')" style="display:flex; align-items:center; justify-content:space-between;">
+                                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                                <i data-lucide="palette" style="width:14px;height:14px;color:#ea580c;"></i>
+                                                <span>Design System & Typography</span>
+                                            </div>
+                                            <span class="pdf-preset-active-badge hidden" style="font-size:0.75rem; color:var(--accent-primary); font-weight:700; background:rgba(139,92,246,0.15); padding:1px 6px; border-radius:10px;">✓ Active</span>
+                                        </button>
+                                        <div class="dropdown-divider"></div>
+                                        <button class="doc-menu-item" onclick="detachCurrentPdf()" style="color:var(--danger);">
+                                            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                            <span>Detach Reference PDF</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Page Navigation Controls -->
+                                <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                    <button class="btn btn-icon" onclick="changePdfPage(-1)" title="Previous Page"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
+                                    <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.25rem;">
+                                        Page <input type="number" id="pdfPageInput" value="1" min="1" max="3" style="width: 36px; text-align: center; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.75rem; padding: 2px 2px; background: var(--bg-surface); color: var(--text-primary); font-weight: 600;" onchange="jumpToPdfPage(this.value)"> / <span id="pdfTotalPages">3</span>
+                                    </div>
+                                    <button class="btn btn-icon" onclick="changePdfPage(1)" title="Next Page"><i data-lucide="chevron-right" style="width:14px;height:14px;"></i></button>
+                                </div>
+
+                                <!-- Zoom Controls -->
+                                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                    <button class="btn btn-icon" onclick="zoomPdf(-10)" title="Zoom Out"><i data-lucide="minus" style="width:14px;height:14px;"></i></button>
+                                    <span id="pdfZoomLevel" style="font-size: 0.75rem; font-weight: 600; min-width: 40px; text-align: center;">125%</span>
+                                    <button class="btn btn-icon" onclick="zoomPdf(10)" title="Zoom In"><i data-lucide="plus" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" onclick="resetPdfZoom()" title="Reset Zoom (100%)"><i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i></button>
+                                </div>
+
+                                <!-- Actions -->
+                                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                    <button class="btn btn-icon" onclick="copyAllPdfText()" title="Copy All Text on Page"><i data-lucide="copy" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" onclick="togglePdfSearch()" title="Search in PDF"><i data-lucide="search" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" onclick="downloadCurrentPdf()" title="Download PDF"><i data-lucide="download" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" id="pdfFullscreenBtn" onclick="togglePdfFullscreen()" title="Full Screen (Maximize PDF)"><i data-lucide="maximize-2" id="pdfFullscreenIcon" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" onclick="togglePdfPanel()" title="Close PDF Reference Pane"><i data-lucide="x" style="width:15px;height:15px;"></i></button>
+                                </div>
+
+                                <!-- Floating PDF Find & Replace Bar -->
+                                <div class="pdf-find-bar hidden" id="pdfFindBar" style="position: absolute; top: calc(100% + 4px); right: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.35rem 0.6rem; display: flex; align-items: center; gap: 0.4rem; box-shadow: var(--shadow-xl); z-index: 45;">
+                                    <i data-lucide="search" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
+                                    <input type="text" id="pdfFindInput" placeholder="Find in PDF..." style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.75rem; padding: 2px 6px; width: 130px; background: var(--bg-app); color: var(--text-primary);" oninput="searchInPdf(this.value)" onkeydown="if(event.key==='Enter')findNextPdfMatch(event.shiftKey?-1:1);else if(event.key==='Escape')togglePdfSearch()">
+                                    <span id="pdfFindMatchesCount" style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); min-width: 32px; text-align: center;">0/0</span>
+                                    <button class="btn btn-icon" onclick="findNextPdfMatch(-1)" style="width: 22px; height: 22px; padding: 0;" title="Previous Match"><i data-lucide="chevron-up" style="width: 12px; height: 12px;"></i></button>
+                                    <button class="btn btn-icon" onclick="findNextPdfMatch(1)" style="width: 22px; height: 22px; padding: 0;" title="Next Match"><i data-lucide="chevron-down" style="width: 12px; height: 12px;"></i></button>
+                                    <button class="btn btn-icon" onclick="togglePdfSearch()" style="width: 22px; height: 22px; padding: 0;" title="Close Find"><i data-lucide="x" style="width: 12px; height: 12px;"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- PDF Annotation & Capture Bar -->
+                            <div class="pdf-annotation-bar" id="pdfAnnotationBar">
+                                <button class="btn btn-icon active" id="pdfToolPointer" onclick="setPdfActiveTool('pointer')" title="Select Pointer"><i data-lucide="mouse-pointer" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolTextBox" onclick="setPdfActiveTool('text-box')" title="Embed Text Box on PDF"><i data-lucide="type" style="width:14px;height:14px;color:#2563eb;"></i></button>
+                                
+                                <!-- Transparent Highlighter with Color Options -->
+                                <div style="position: relative; display: inline-flex; align-items: center;" id="pdfHighlightGroup">
+                                    <button class="btn btn-icon" id="pdfToolHighlight" onclick="setPdfActiveTool('highlight')" title="Highlight Text (Click again to change color)"><i data-lucide="highlighter" id="pdfHighlightIcon" style="width:14px;height:14px;color:#f59e0b;"></i></button>
+                                    <button class="btn btn-icon" onclick="togglePdfHighlightPalette(event)" id="pdfHighlightPaletteBtn" style="width: 14px; padding: 0; margin-left: -4px;" title="Choose Highlight Color"><i data-lucide="chevron-down" style="width: 10px; height: 10px;"></i></button>
+                                    
+                                    <!-- Highlighter Color Palette Menu -->
+                                    <div class="doc-dropdown-menu hidden" id="pdfHighlightPalette" style="position: absolute; top: calc(100% + 4px); left: 0; width: 140px; z-index: 1050; padding: 6px; box-shadow: var(--shadow-xl);">
+                                        <div style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; padding: 0 4px; text-transform: uppercase;">Highlight Colors</div>
+                                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 2px;">
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #fde047; border: 1.5px solid #ca8a04; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(250, 204, 21, 0.35)', '#ca8a04', 'Yellow')" title="Yellow"></button>
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #86efac; border: 1.5px solid #16a34a; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(34, 197, 94, 0.35)', '#16a34a', 'Green')" title="Green"></button>
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #93c5fd; border: 1.5px solid #2563eb; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(59, 130, 246, 0.35)', '#2563eb', 'Blue')" title="Blue"></button>
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #f472b6; border: 1.5px solid #db2777; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(244, 63, 94, 0.35)', '#db2777', 'Pink')" title="Pink"></button>
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #c084fc; border: 1.5px solid #9333ea; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(168, 85, 247, 0.35)', '#9333ea', 'Purple')" title="Purple"></button>
+                                            <button class="color-chip" style="width: 34px; height: 22px; border-radius: 4px; background: #fdba74; border: 1.5px solid #ea580c; cursor: pointer;" onclick="selectPdfHighlightColor('rgba(249, 115, 22, 0.35)', '#ea580c', 'Orange')" title="Orange"></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-icon" id="pdfToolUnderline" onclick="setPdfActiveTool('underline')" title="Underline Text"><i data-lucide="underline" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolPen" onclick="setPdfActiveTool('pen')" title="Pen Drawing"><i data-lucide="pen-tool" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolRect" onclick="setPdfActiveTool('rect')" title="Rectangle Shape"><i data-lucide="square" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolArrow" onclick="setPdfActiveTool('arrow')" title="Arrow"><i data-lucide="arrow-up-right" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolNote" onclick="setPdfActiveTool('note')" title="Add Sticky Note on PDF"><i data-lucide="sticky-note" style="width:14px;height:14px;color:#eab308;"></i></button>
+                                <button class="btn btn-icon" id="pdfToolEraser" onclick="setPdfActiveTool('eraser')" title="Eraser / Click Annotation to Delete"><i data-lucide="eraser" style="width:14px;height:14px;"></i></button>
+                                
+                                <div class="toolbar-divider" style="height: 16px;"></div>
+
+                                <!-- Undo & Redo Tools for PDF Annotations -->
+                                <button class="btn btn-icon disabled" id="pdfToolUndo" onclick="undoPdfAnnotation()" title="Undo Annotation (Cmd+Z)"><i data-lucide="undo-2" style="width:14px;height:14px;"></i></button>
+                                <button class="btn btn-icon disabled" id="pdfToolRedo" onclick="redoPdfAnnotation()" title="Redo Annotation (Cmd+Shift+Z)"><i data-lucide="redo-2" style="width:14px;height:14px;"></i></button>
+
+                                <div class="toolbar-divider" style="height: 16px;"></div>
+
+                                <!-- Signature SyncPad PDF Capture Tool -->
+                                <button class="btn btn-primary" id="pdfCaptureBtn" onclick="togglePdfCaptureMode()" style="height: 26px; padding: 0.2rem 0.65rem; font-size: 0.72rem; gap: 0.35rem; background: var(--accent-primary);" title="Capture region to copy text or snapshot into document">
+                                    <i data-lucide="crop" style="width:13px;height:13px;"></i>
+                                    <span>Capture</span>
+                                </button>
+                            </div>
+
+                            <!-- PDF Canvas Document Container -->
+                            <div class="pdf-canvas-container" id="pdfCanvasContainer">
+                                
+                                <!-- Real PDF Page Wrapper -->
+                                <div class="pdf-page-wrapper" id="pdfPageWrapper">
+                                    <canvas id="pdfRenderCanvas" class="pdf-render-canvas"></canvas>
+                                    <canvas id="pdfAnnotationCanvas" class="pdf-annotation-canvas"></canvas>
+                                    <div id="pdfTextLayer" class="pdf-text-layer"></div>
+                                    <div id="pdfTextBoxesLayer" class="pdf-text-boxes-layer"></div>
+                                    <div id="pdfStickyNotesLayer" class="pdf-sticky-notes-layer"></div>
+
+                                    <!-- Floating Text Selection Quick Action Toolbar -->
+                                    <div class="pdf-selection-toolbar hidden" id="pdfSelectionToolbar">
+                                        <button class="btn btn-outline" onclick="copyPdfSelectedText()" style="padding: 2px 7px; font-size: 0.7rem; height: 24px; gap: 4px;" title="Copy Selected Text">
+                                            <i data-lucide="copy" style="width: 12px; height: 12px; color: var(--accent-primary);"></i>
+                                            <span>Copy</span>
+                                        </button>
+                                        <button class="btn btn-outline" onclick="quotePdfSelectedTextInDoc()" style="padding: 2px 7px; font-size: 0.7rem; height: 24px; gap: 4px;" title="Quote Selected Text in Current Document">
+                                            <i data-lucide="quote" style="width: 12px; height: 12px; color: #2563eb;"></i>
+                                            <span>Quote in Doc</span>
+                                        </button>
+                                        <button class="btn btn-outline" onclick="highlightPdfSelectedText()" style="padding: 2px 7px; font-size: 0.7rem; height: 24px; gap: 4px;" title="Highlight Selected Text">
+                                            <i data-lucide="highlighter" style="width: 12px; height: 12px; color: #f59e0b;"></i>
+                                            <span>Highlight</span>
+                                        </button>
+                                        <button class="btn btn-outline" onclick="addStickyNoteToSelection()" style="padding: 2px 7px; font-size: 0.7rem; height: 24px; gap: 4px;" title="Add Sticky Note on Selected Text">
+                                            <i data-lucide="sticky-note" style="width: 12px; height: 12px; color: #eab308;"></i>
+                                            <span>Note</span>
+                                        </button>
+                                    </div>
+
+                                    <!-- Fallback Mock Container (hidden by default when canvas renders) -->
+                                    <div class="pdf-page-mock" id="pdfPageMock" style="display: none;"></div>
+
+                                    <!-- Floating Camera Hover Reticle (follows mouse in capture mode) -->
+                                    <div class="pdf-camera-reticle hidden" id="pdfCameraReticle">
+                                        <div class="camera-reticle-lens">
+                                            <i data-lucide="camera" style="width: 14px; height: 14px; color: #60a5fa;"></i>
+                                            <span>Click to place capture box</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Interactive Draggable & 4-Corner Resizable PDF Capture Box -->
+                                    <div class="pdf-capture-box hidden" id="pdfCaptureBox" style="display: none; top: 140px; left: 24px; width: 380px; height: 180px;">
+                                        <div class="resize-handle handle-nw" data-handle="nw" title="Resize Top-Left"></div>
+                                        <div class="resize-handle handle-ne" data-handle="ne" title="Resize Top-Right"></div>
+                                        <div class="resize-handle handle-sw" data-handle="sw" title="Resize Bottom-Left"></div>
+                                        <div class="resize-handle handle-se" data-handle="se" title="Resize Bottom-Right"></div>
+                                        
+                                        <div id="pdfCaptureDimensionBadge" class="pdf-capture-dimension-badge">
+                                            <i data-lucide="scan" style="width: 11px; height: 11px;"></i>
+                                            <span id="pdfCaptureDimText">380 × 180px • PDF Snapshot</span>
+                                            <button type="button" class="pdf-capture-close-btn" id="pdfCaptureCloseBtn" onclick="if(window.pdfCaptureManager)window.pdfCaptureManager.setCaptureMode(false);" title="Close Capture Box">
+                                                <i data-lucide="x" style="width: 10px; height: 10px;"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Floating Action Menu on PDF Capture (4 Actions) -->
+                                        <div class="pdf-capture-menu" id="pdfCaptureMenu">
+                                            <button class="btn btn-outline" onclick="capturePdfAction('snapshot')" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; height: 26px;" title="Capture high-res visual snapshot to clipboard">
+                                                <i data-lucide="camera" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                                <span>Snapshot</span>
+                                            </button>
+                                            <button class="btn btn-outline" onclick="capturePdfAction('copy')" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; height: 26px;" title="Extract & copy text within this region">
+                                                <i data-lucide="copy" style="width:13px;height:13px;"></i>
+                                                <span>Copy Text</span>
+                                            </button>
+                                            <button class="btn btn-primary" onclick="capturePdfAction('insert')" style="padding: 0.25rem 0.65rem; font-size: 0.72rem; height: 26px;" title="Insert snapshot or text quote into active document">
+                                                <i data-lucide="corner-down-right" style="width:13px;height:13px;"></i>
+                                                <span>Insert into Document</span>
+                                            </button>
+                                            <button class="btn btn-outline" onclick="capturePdfAction('annotate')" style="padding: 0.25rem 0.55rem; font-size: 0.72rem; height: 26px;" title="Annotate this region">
+                                                <i data-lucide="edit-3" style="width:13px;height:13px;"></i>
+                                                <span>Annotate</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- C. DRAGGABLE RESIZER DIVIDER -->
+                        <div class="doc-pane-resizer" id="docPaneResizer" title="Drag to resize split panes"></div>
+
+                        <!-- D. DOCUMENT EDITOR PANE -->
+                        <div class="doc-editor-pane" id="docEditorPane">
+                            
+                            <!-- FLOATING FIND & REPLACE BAR (WHEN ACTIVE) -->
+                            <div id="docFindBar" class="doc-find-bar hidden">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <i data-lucide="search" style="width:15px;height:15px;color:var(--text-muted);"></i>
+                                    <input type="text" id="docFindInput" placeholder="Find in document..." style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 160px; outline: none; background: var(--bg-surface); color: var(--text-primary);" oninput="onSearchDoc(this.value)" onkeydown="if(event.key==='Enter'){if(event.shiftKey)findPrevMatch();else findNextMatch();}">
+                                    <span id="docFindCounter" style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; min-width: 34px; text-align: center;">0 / 0</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.2rem;">
+                                    <button class="btn btn-icon" style="width:26px;height:26px;" onclick="findPrevMatch()" title="Previous match (Shift+Enter)"><i data-lucide="chevron-up" style="width:14px;height:14px;"></i></button>
+                                    <button class="btn btn-icon" style="width:26px;height:26px;" onclick="findNextMatch()" title="Next match (Enter)"><i data-lucide="chevron-down" style="width:14px;height:14px;"></i></button>
+                                </div>
+                                <div class="toolbar-divider" style="height: 18px;"></div>
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <input type="text" id="docReplaceInput" placeholder="Replace with..." style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 140px; outline: none; background: var(--bg-surface); color: var(--text-primary);">
+                                    <button class="btn btn-outline" onclick="replaceCurrentMatch()" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; height: 26px;">Replace</button>
+                                    <button class="btn btn-outline" onclick="replaceAllMatches()" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; height: 26px;">All</button>
+                                    <button class="btn btn-icon" onclick="closeDocSearch()" style="width:26px;height:26px;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- DOCUMENT PAGE SHEET (PLAIN AUTHENTIC DOCUMENT SHEET) -->
+                            <!-- DOCUMENT PAGE SHEET (PLAIN AUTHENTIC DOCUMENT SHEET) -->
+                            <div class="doc-page-sheet-container">
+                                <div class="doc-page-sheet" id="docPageSheet" contenteditable="true" spellcheck="true" oninput="onDocChange()">
+                                    <h1>System Architecture & Real-Time Sync Engine</h1>
+                                    <p>
+                                        SyncPad is engineered as a unified collaborative document and visual research workspace. It enables seamless bi-directional synchronization between rich-text notes and reference PDF literature.
+                                    </p>
+                                    <p>
+                                        When an editor enters keystrokes or formats content, mutation deltas are dispatched to the distributed STOMP broker for immediate broadcast to all active workspace participants.
+                                    </p>
+                                </div>
+                                <!-- Document Smooth Annotation Canvas Layer -->
+                                <canvas id="docAnnotationCanvas" class="doc-annotation-canvas"></canvas>
+                                <!-- Multi-Page Breaks Layer -->
+                                <div id="docPageBreaksLayer" class="doc-page-breaks-layer"></div>
+                                <!-- Collaborative Cursors Layer -->
+                                <div id="collabCursorsLayer" class="collab-cursors-layer"></div>
+                            </div>
+                        </div>
+
+                        <!-- Floating Sliding Document Annotation Toolbar Dock (Slides to the left) -->
+                        <div id="docAnnotationDock" class="doc-annotation-dock">
+                            <div class="doc-annot-drag-handle">
+                                <i data-lucide="grip-vertical" style="width:12px;height:12px;color:var(--text-muted);"></i>
+                            </div>
+                            
+                            <!-- Pen Tool -->
+                            <button class="doc-annot-tool-btn active" id="annotPenToolBtn" onclick="setDocAnnotTool('pen')" title="Pen Tool (Smooth Drawing)">
+                                <i data-lucide="pen-tool" style="width:15px;height:15px;"></i>
+                                <span id="annotPenColorIndicator" class="annot-color-dot" style="background-color: #2563eb;"></span>
+                            </button>
+
+                            <!-- Color & Size Dropdown Trigger -->
+                            <div style="position: relative;">
+                                <button class="doc-annot-dropdown-btn" id="annotColorDropdownBtn" onclick="toggleDocAnnotColorMenu(event)" title="Pen Color & Size">
+                                    <span class="annot-color-preview-circle" id="annotActiveColorPreview" style="background-color: #2563eb;"></span>
+                                    <i data-lucide="chevron-down" style="width:12px;height:12px;color:var(--text-muted);"></i>
+                                </button>
+                                <!-- Pen Color & Size Dropdown Menu -->
+                                <div id="docAnnotColorMenu" class="doc-annot-popup-menu hidden">
+                                    <div class="doc-annot-menu-header">Pen Color</div>
+                                    <div class="doc-annot-color-palette">
+                                        <button class="doc-color-circle" style="background: #0f172a;" onclick="selectDocAnnotColor('#0f172a')" title="Black"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle active" style="background: #2563eb;" onclick="selectDocAnnotColor('#2563eb')" title="Royal Blue"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #dc2626;" onclick="selectDocAnnotColor('#dc2626')" title="Crimson Red"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #059669;" onclick="selectDocAnnotColor('#059669')" title="Emerald Green"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #7c3aed;" onclick="selectDocAnnotColor('#7c3aed')" title="Purple"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #ea580c;" onclick="selectDocAnnotColor('#ea580c')" title="Orange"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #db2777;" onclick="selectDocAnnotColor('#db2777')" title="Pink"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                        <button class="doc-color-circle" style="background: #0891b2;" onclick="selectDocAnnotColor('#0891b2')" title="Cyan"><i data-lucide="check" style="width:11px;height:11px;color:#fff;"></i></button>
+                                    </div>
+                                    
+                                    <div class="doc-annot-menu-header" style="margin-top: 8px;">Stroke Width</div>
+                                    <div class="doc-annot-size-picker">
+                                        <button class="doc-size-btn" id="annotSizeBtn2" onclick="selectDocAnnotSize(2)" title="Thin (2px)"><span style="width: 4px; height: 4px; background: currentColor; border-radius: 50%;"></span></button>
+                                        <button class="doc-size-btn active" id="annotSizeBtn4" onclick="selectDocAnnotSize(4)" title="Medium (4px)"><span style="width: 8px; height: 8px; background: currentColor; border-radius: 50%;"></span></button>
+                                        <button class="doc-size-btn" id="annotSizeBtn8" onclick="selectDocAnnotSize(8)" title="Bold (8px)"><span style="width: 12px; height: 12px; background: currentColor; border-radius: 50%;"></span></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="doc-annot-divider"></div>
+
+                            <!-- Highlighter Tool -->
+                            <button class="doc-annot-tool-btn" id="annotHighlighterToolBtn" onclick="setDocAnnotTool('highlighter')" title="Highlighter">
+                                <i data-lucide="highlighter" style="width:15px;height:15px;"></i>
+                                <span id="annotHighlighterColorIndicator" class="annot-color-dot" style="background-color: #fef08a;"></span>
+                            </button>
+
+                            <!-- Eraser Tool -->
+                            <button class="doc-annot-tool-btn" id="annotEraserToolBtn" onclick="setDocAnnotTool('eraser')" title="Eraser Tool">
+                                <i data-lucide="eraser" style="width:15px;height:15px;"></i>
+                            </button>
+
+                            <div class="doc-annot-divider"></div>
+
+                            <!-- Undo / Redo -->
+                            <button class="doc-annot-icon-btn" onclick="undoDocAnnotation()" title="Undo Stroke (Ctrl+Z)">
+                                <i data-lucide="undo" style="width:14px;height:14px;"></i>
+                            </button>
+                            <button class="doc-annot-icon-btn" onclick="redoDocAnnotation()" title="Redo Stroke (Ctrl+Y)">
+                                <i data-lucide="redo" style="width:14px;height:14px;"></i>
+                            </button>
+
+                            <!-- Clear All -->
+                            <button class="doc-annot-icon-btn danger" onclick="clearDocAnnotations()" title="Clear All Annotations">
+                                <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                            </button>
+
+                            <div class="doc-annot-divider"></div>
+
+                            <!-- Close / Done Annotation Mode -->
+                            <button class="btn btn-primary" onclick="toggleAnnotationMode(false)" style="height: 28px; padding: 0 0.65rem; font-size: 0.75rem; border-radius: 14px; gap: 4px;" title="Exit Annotation Mode">
+                                <i data-lucide="check" style="width:13px;height:13px;"></i>
+                                <span>Done</span>
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <!-- 4. BOTTOM STATUS / COLLABORATION FOOTER BAR -->
+                    <footer style="height: 32px; border-top: 1px solid var(--border-color); background: var(--bg-surface); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; font-size: 0.75rem; color: var(--text-muted); flex-shrink: 0; z-index: 30;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span>SyncPad Document Engine v2.4 • Markdown & Rich Text • UTF-8</span>
+                            <span class="toolbar-divider" style="height: 12px;"></span>
+                            <span id="docStatsLabel">1,428 words • 8,940 characters • 5 min read</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span id="docConnectedUsersCount" style="display: flex; align-items: center; gap: 0.35rem; color: var(--success);"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);"></span> 1 user connected</span>
+                            <span class="toolbar-divider" style="height: 12px;"></span>
+                            <span id="docSyncLatency">Latency: 12ms</span>
+                            <span class="toolbar-divider" style="height: 12px;"></span>
+                            <span id="footerStatusText">Auto-saved at 4:32:15 PM</span>
+                        </div>
+                    </footer>
+
+                    <!-- ========================================================================= -->
+                    <!-- 5. FLOATING POPUPS, LAYOUT SWITCHER, CAPTURE CONFIRMATION & MODALS -->
+                    <!-- ========================================================================= -->
+
+                    <!-- CONTRIBUTOR MENTION DROPDOWN POPUP -->
+                    <div id="docMentionDropdown" class="doc-mention-dropdown hidden">
+                        <div class="doc-mention-header">
+                            <span style="display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="users" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                <span>Mention Contributor</span>
+                            </span>
+                            <span id="docMentionCount" style="font-size: 0.65rem; color: var(--text-muted); font-weight: 500;">0 found</span>
+                        </div>
+                        <div id="docMentionList" class="doc-mention-list">
+                            <!-- Dynamically populated contributor items -->
+                        </div>
+                        <div class="doc-mention-footer">
+                            <span><kbd style="font-size:0.6rem;background:var(--bg-hover);padding:1px 4px;border-radius:3px;">↑↓</kbd> navigate</span>
+                            <span><kbd style="font-size:0.6rem;background:var(--bg-hover);padding:1px 4px;border-radius:3px;">↵</kbd> select</span>
+                            <span><kbd style="font-size:0.6rem;background:var(--bg-hover);padding:1px 4px;border-radius:3px;">esc</kbd> close</span>
+                        </div>
+                    </div>
+
+                    <!-- LAYOUT SWITCHER POPOVER -->
+                    <div id="layoutSwitcherPopover" class="doc-floating-menu hidden" style="top: 52px; right: 260px; width: 340px; padding: 0.85rem;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span>Workspace View Layouts</span>
+                            <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 400;">6 visual presets</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;">
+                            
+                            <!-- 1. Document Only -->
+                            <div class="layout-choice-card" onclick="setDocLayout('doc-only')">
+                                <div class="layout-preview-thumb">
+                                    <div style="flex: 1; background: var(--bg-surface); border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">Doc Only</span>
+                            </div>
+
+                            <!-- 2. PDF Left / Doc Right -->
+                            <div class="layout-choice-card active" onclick="setDocLayout('pdf-left')">
+                                <div class="layout-preview-thumb">
+                                    <div style="width: 40%; background: #475569; border-radius: 2px;"></div>
+                                    <div style="width: 60%; background: var(--bg-surface); border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">PDF Left</span>
+                            </div>
+
+                            <!-- 3. Doc Left / PDF Right -->
+                            <div class="layout-choice-card" onclick="setDocLayout('pdf-right')">
+                                <div class="layout-preview-thumb">
+                                    <div style="width: 60%; background: var(--bg-surface); border-radius: 2px;"></div>
+                                    <div style="width: 40%; background: #475569; border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">PDF Right</span>
+                            </div>
+
+                            <!-- 4. PDF Top / Doc Bottom -->
+                            <div class="layout-choice-card" onclick="setDocLayout('pdf-top')">
+                                <div class="layout-preview-thumb" style="flex-direction: column;">
+                                    <div style="height: 45%; background: #475569; border-radius: 2px;"></div>
+                                    <div style="height: 55%; background: var(--bg-surface); border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">PDF Top</span>
+                            </div>
+
+                            <!-- 5. Doc Top / PDF Bottom -->
+                            <div class="layout-choice-card" onclick="setDocLayout('pdf-bottom')">
+                                <div class="layout-preview-thumb" style="flex-direction: column;">
+                                    <div style="height: 55%; background: var(--bg-surface); border-radius: 2px;"></div>
+                                    <div style="height: 45%; background: #475569; border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">PDF Bottom</span>
+                            </div>
+
+                            <!-- 6. Split Equal -->
+                            <div class="layout-choice-card" onclick="setDocLayout('split-equal')">
+                                <div class="layout-preview-thumb">
+                                    <div style="width: 50%; background: #475569; border-radius: 2px;"></div>
+                                    <div style="width: 50%; background: var(--bg-surface); border-radius: 2px;"></div>
+                                </div>
+                                <span style="font-size: 0.72rem; font-weight: 600;">50 / 50 Split</span>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- PDF CAPTURE INSERT CONFIRMATION MODAL -->
+                    <div id="insertCaptureModal" class="modal-overlay hidden" style="z-index: 150;">
+                        <div class="modal-content" style="max-width: 440px; padding: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--icon-doc-bg); color: var(--accent-primary); display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="corner-down-right" style="width: 15px; height: 15px;"></i>
+                                    </div>
+                                    <h3 style="font-size: 1rem; font-weight: 700;">Insert PDF Selection</h3>
+                                </div>
+                                <button class="btn btn-icon" onclick="closeInsertCaptureModal()"><i data-lucide="x" style="width: 16px; height: 16px;"></i></button>
+                            </div>
+
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+                                How would you like to insert the captured PDF region (Figure 4.2 Architecture) into your document?
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem;">
+                                <label style="display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer;">
+                                    <input type="radio" name="insertCaptureType" value="snapshot" checked style="margin-top: 3px;">
+                                    <div>
+                                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">High-Res Image Snapshot</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Insert as visual reference figure with page citation.</div>
+                                    </div>
+                                </label>
+                                <label style="display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer;">
+                                    <input type="radio" name="insertCaptureType" value="text" style="margin-top: 3px;">
+                                    <div>
+                                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Extracted Formatted Text (OCR)</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Extract selectable text and paste into current cursor line.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+                                <button class="btn btn-outline" onclick="closeInsertCaptureModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="confirmInsertCapture()">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                                    <span>Insert into Document</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DOCUMENT INFORMATION & METADATA MODAL -->
+                    <div id="docInfoModal" class="modal-overlay hidden" style="z-index: 150;">
+                        <div class="modal-content" style="max-width: 480px; padding: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <i data-lucide="info" style="width: 18px; height: 18px; color: var(--accent-primary);"></i>
+                                    <h3 style="font-size: 1.05rem; font-weight: 700;">Document Details & Analytics</h3>
+                                </div>
+                                <button class="btn btn-icon" onclick="closeDocInfoModal()"><i data-lucide="x" style="width: 16px; height: 16px;"></i></button>
+                            </div>
+                            
+                            <!-- Loading State -->
+                            <div id="docInfoLoading" class="hidden" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
+                                <div class="spinner" style="width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">Loading document details...</span>
+                            </div>
+                            
+                            <!-- Error State -->
+                            <div id="docInfoError" class="hidden" style="background: var(--destructive-bg); border: 1px solid var(--destructive); border-radius: var(--radius-sm); padding: 0.75rem; color: var(--destructive); margin-bottom: 1.25rem; display: none;">
+                                <i data-lucide="alert-circle" style="width: 16px; height: 16px; color: var(--destructive); margin-right: 0.5rem;"></i>
+                                <span id="docErrorMessage">Access denied: You do not have permission to view this document details.</span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+                                <div class="card" style="padding: 0.75rem; background: var(--bg-hover);">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Words</div>
+                                    <div id="docInfoWords" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                </div>
+                                <div class="card" style="padding: 0.75rem; background: var(--bg-hover);">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Characters</div>
+                                    <div id="docInfoChars" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                </div>
+                                <div class="card" style="padding: 0.75rem; background: var(--bg-hover);">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Reading Time</div>
+                                    <div id="docInfoReadTime" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">~1 min</div>
+                                </div>
+                                <div class="card" style="padding: 0.75rem; background: var(--bg-hover);">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Paragraphs</div>
+                                    <div id="docInfoParagraphs" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">1</div>
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Created By:</span>
+                                    <span id="docInfoCreatedBy" style="font-weight: 600; color: var(--text-primary);">You</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Created Date:</span>
+                                    <span id="docInfoCreatedAt" style="font-weight: 600; color: var(--text-primary);">Just now</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Last Edited By:</span>
+                                    <span id="docInfoLastEditedBy" style="font-weight: 600; color: var(--accent-primary);">You</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Storage Location:</span>
+                                    <span id="docInfoLocation" style="font-weight: 600; color: var(--text-primary);">Workspace</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Version:</span>
+                                    <span id="docInfoVersion" style="font-weight: 600; color: var(--text-primary);">v1 (Synchronized)</span>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+                                <button class="btn btn-outline" onclick="closeDocInfoModal()">Close</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>

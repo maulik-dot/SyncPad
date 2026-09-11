@@ -1,0 +1,60 @@
+                <div id="homeView" style="flex: 1; overflow-y: auto; padding: 2rem;">
+                    
+                    <!-- GREETING & QUICK ACTION BANNER -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1.25rem;">
+                        <div>
+                            <h1 id="homeGreetingTitle" style="font-size: 1.6rem; font-weight: 700; margin-bottom: 0.25rem;">Welcome back, User</h1>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Overview of all your collaborative workspaces, recent folders, and active documents.</p>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button class="btn btn-outline" onclick="openNewWorkspaceContainerModal()">
+                                <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                                <span>Create Workspace</span>
+                            </button>
+                            <button class="btn btn-primary" onclick="openCreateModal()">
+                                <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                                <span>New Item</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- WORKSPACES SECTION -->
+                    <div style="margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600;">Your Workspaces</h2>
+                            <button class="btn btn-outline" onclick="openNewWorkspaceContainerModal()" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">
+                                <i data-lucide="plus" style="width:15px;height:15px;"></i>
+                                <span>Add Workspace</span>
+                            </button>
+                        </div>
+                        <div id="homeWorkspacesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+                            <!-- Workspaces rendered dynamically as rich cards -->
+                        </div>
+                    </div>
+
+                    <!-- RECENT FOLDERS SECTION -->
+                    <div style="margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600;">Recent Folders</h2>
+                            <button class="btn btn-outline" onclick="openCreateFolderModal()" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">
+                                <i data-lucide="folder-plus" style="width:15px;height:15px;"></i>
+                                <span>Add Folder</span>
+                            </button>
+                        </div>
+                        <div id="homeFoldersGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem;">
+                            <!-- Recent folders rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- RECENT FILES SECTION -->
+                    <div style="margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600;">Recent Files</h2>
+                        </div>
+                        <div id="homeFilesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">
+                            <!-- Recent files rendered dynamically -->
+                        </div>
+                    </div>
+
+                </div>

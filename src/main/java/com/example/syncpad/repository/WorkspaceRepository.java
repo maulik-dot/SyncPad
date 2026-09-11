@@ -11,5 +11,11 @@ import com.example.syncpad.entity.Workspace;
 @Repository
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     List<Workspace> findByOwnerId(Long ownerId);
-    Optional<Workspace> findByName(String name);
+    Optional<Workspace> findFirstByName(String name);
+    List<Workspace> findAllByName(String name);
+
+    default Optional<Workspace> findByName(String name) {
+        return findFirstByName(name);
+    }
 }
+

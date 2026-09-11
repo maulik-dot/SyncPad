@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace Dashboard Reference — SyncPad</title>
+    
+    <!-- Google Fonts & Lucide Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body style="background: var(--bg-canvas, #f8fafc); min-height: 100vh; margin: 0; overflow: hidden;">
+
+    <div style="display: flex; height: 100vh;">
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="sidebar" style="width: 260px; border-right: 1px solid var(--border-color); background: var(--bg-sidebar, #f1f5f9); display: flex; flex-direction: column; padding: 1.25rem 1rem; flex-shrink: 0;">
+            
+            <!-- WORKSPACE SWITCHER DROPDOWN HEADER -->
+            <div style="position: relative; margin-bottom: 1rem;">
+                <button onclick="toggleWorkspaceMenu()" class="btn btn-outline" style="width: 100%; justify-content: space-between; padding: 0.55rem 0.75rem; border-color: var(--border-color); background: var(--bg-surface);">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden;">
+                        <div id="wsInitialBadge" class="avatar" style="width: 26px; height: 26px; font-size: 0.75rem; background: var(--accent-primary); color: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700;">P</div>
+                        <span id="wsCurrentName" style="font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Personal Workspace</span>
+                    </div>
+                    <i data-lucide="chevron-down" style="width:16px;height:16px;color:var(--text-muted);flex-shrink:0;"></i>
+                </button>
+
+                <!-- WORKSPACE DROPDOWN MENU -->
+                <div id="workspaceMenu" class="card hidden" style="position: absolute; top: 110%; left: 0; right: 0; z-index: 50; padding: 0.5rem; box-shadow: var(--shadow-lg);">
+                    <div id="workspaceMenuList" style="display: flex; flex-direction: column; gap: 0.2rem; max-height: 180px; overflow-y: auto;">
+                        <button class="sidebar-item active" style="width: 100%; border: none; background: transparent; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="avatar" style="width: 20px; height: 20px; font-size: 0.65rem; background: #2563eb; color: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center;">P</div>
+                                <span style="font-size: 0.84rem; font-weight: 600;">Personal Workspace</span>
+                            </div>
+                            <span class="badge badge-role" style="font-size: 0.65rem;">Admin</span>
+                        </button>
+                        <button class="sidebar-item" style="width: 100%; border: none; background: transparent; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="avatar" style="width: 20px; height: 20px; font-size: 0.65rem; background: #8b5cf6; color: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center;">T</div>
+                                <span style="font-size: 0.84rem;">Team Workspace</span>
+                            </div>
+                            <span class="badge" style="font-size: 0.65rem;">Member</span>
+                        </button>
+                    </div>
+                    <div style="border-top: 1px solid var(--border-color); margin-top: 0.5rem; padding-top: 0.5rem;">
+                        <button onclick="alert('Demo: Create Workspace clicked')" class="sidebar-item" style="width: 100%; text-align: left; background: transparent; border: none; color: var(--accent-primary);">
+                            <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                            <span>Create Workspace</span>
+                        </button>
+                        <button onclick="alert('Demo: Workspace Members clicked')" class="sidebar-item" style="width: 100%; text-align: left; background: transparent; border: none;">
+                            <i data-lucide="users" style="width:16px;height:16px;"></i>
+                            <span>Workspace Members</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW ITEM BUTTON (DOC / WHITEBOARD / FOLDER) -->
+            <button class="btn btn-primary" onclick="alert('Demo: Create New Item (Doc / Board / Folder)')" style="width: 100%; justify-content: flex-start; padding: 0.65rem 0.85rem; margin-bottom: 1rem;">
+                <i data-lucide="plus" style="width:18px;height:18px;"></i>
+                <span>New Item</span>
+            </button>
+
+            <!-- SIDEBAR NAV -->
+            <nav class="sidebar-nav" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <a href="/" class="sidebar-item">
+                    <i data-lucide="home" style="width:18px;height:18px;"></i>
+                    <span>Home Overview</span>
+                </a>
+                <a href="/views/dashboard.html" class="sidebar-item active">
+                    <i data-lucide="layout-grid" style="width:18px;height:18px;"></i>
+                    <span>Active Workspace</span>
+                </a>
+
+                <div class="sidebar-section-title" style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0.85rem 0 0.35rem 0.5rem; letter-spacing: 0.05em;">Views</div>
+                <a href="#" class="sidebar-item" onclick="alert('Notifications')">
+                    <i data-lucide="bell" style="width:18px;height:18px;"></i>
+                    <span>Notifications</span>
+                    <span class="notif-badge-pill" style="margin-left:auto; font-size:0.68rem; padding:1px 6px; background:var(--accent-primary); color:#fff; border-radius: 999px;">3</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="alert('Shared with me')">
+                    <i data-lucide="users" style="width:18px;height:18px;"></i>
+                    <span>Shared with me</span>
+                    <span class="notif-badge-pill role" style="margin-left:auto; font-size:0.68rem; padding:1px 6px;">2</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="alert('Starred documents')">
+                    <i data-lucide="star" style="width:18px;height:18px;color:#f59e0b;"></i>
+                    <span>Starred</span>
+                    <span class="notif-badge-pill role" style="margin-left:auto; font-size:0.68rem; padding:1px 6px;">4</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="alert('Recent documents')">
+                    <i data-lucide="clock" style="width:18px;height:18px;"></i>
+                    <span>Recent</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="alert('Trash')">
+                    <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
+                    <span>Trash</span>
+                </a>
+            </nav>
+
+            <div style="padding-top: 1rem; border-top: 1px solid var(--border-color); margin-top: auto;">
+                <a href="#" class="sidebar-item" onclick="alert('Settings view')">
+                    <i data-lucide="settings" style="width:18px;height:18px;"></i>
+                    <span>Settings</span>
+                </a>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; margin-top: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div id="userAvatar" class="avatar" style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem;">A</div>
+                        <div>
+                            <div id="userName" style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Alex Morgan</div>
+                            <div id="userEmailDisplay" style="font-size: 0.72rem; color: var(--text-muted);">demo@syncpad.com</div>
+                        </div>
+                    </div>
+                    <a href="/views/login.html" class="btn btn-icon btn-icon-danger" title="Sign Out" aria-label="Sign Out">
+                        <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-app, #f8fafc);">
+            
+            <!-- TOP HEADER BAR -->
+            <header style="height: 56px; border-bottom: 1px solid var(--border-color); background: var(--bg-surface); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">Personal Workspace</span>
+                        <span class="badge badge-role" style="font-size: 0.68rem;">Admin</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <!-- SEARCH BAR -->
+                    <div style="position: relative; width: 280px;">
+                        <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted);"></i>
+                        <input type="text" class="input" placeholder="Search docs, folders, tags (Cmd+K)" style="width: 100%; padding-left: 2rem; font-size: 0.82rem; height: 34px;">
+                    </div>
+
+                    <!-- NOTIFICATIONS BUTTON -->
+                    <button class="btn btn-icon" onclick="alert('3 new notifications')" title="Notifications" aria-label="Notifications" style="position: relative;">
+                        <i data-lucide="bell" style="width:18px;height:18px;"></i>
+                        <span class="header-notif-badge" style="position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span>
+                    </button>
+
+                    <!-- QUICK NEW DOC BUTTON -->
+                    <button class="btn btn-primary" onclick="alert('Creating new document...')" style="font-size: 0.82rem; padding: 0.4rem 0.8rem; height: 34px;">
+                        <i data-lucide="plus" style="width:15px;height:15px;"></i>
+                        <span>New Doc</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- DASHBOARD VIEW BODY -->
+            <div style="flex: 1; overflow-y: auto; padding: 2rem 2.5rem;">
+                
+                <!-- WORKSPACE TITLE & CONTROLS -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <div>
+                        <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem; color: var(--text-primary);">Personal Workspace</h1>
+                        <p style="font-size: 0.85rem; color: var(--text-muted);">Organize your team's documents, folders, and real-time whiteboards.</p>
+                    </div>
+
+                    <!-- WORKSPACE ACTIONS (BUTTONS) -->
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <div class="btn-group" style="display: flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-surface);">
+                            <button class="btn btn-icon active" style="width: 34px; height: 34px; background: var(--bg-hover);" title="Grid View">
+                                <i data-lucide="grid" style="width:16px;height:16px;"></i>
+                            </button>
+                            <button class="btn btn-icon" style="width: 34px; height: 34px;" title="List View">
+                                <i data-lucide="list" style="width:16px;height:16px;"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-outline" onclick="alert('Create Folder Modal')" style="font-size: 0.82rem; padding: 0.45rem 0.85rem;">
+                            <i data-lucide="folder-plus" style="width:15px;height:15px;"></i>
+                            <span>Add Folder</span>
+                        </button>
+                        <button class="btn btn-primary" onclick="alert('New Item Modal')" style="font-size: 0.82rem; padding: 0.45rem 0.95rem;">
+                            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                            <span>New Item</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- FOLDERS SECTION WITH VISIBLE CARD ACTION BUTTONS -->
+                <!-- ========================================================================= -->
+                <div style="margin-bottom: 2.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">Folders</h2>
+                            <span class="badge" style="font-size: 0.7rem; font-weight: 700;">3</span>
+                        </div>
+                        <button class="btn btn-outline" onclick="alert('Add Folder clicked')" style="font-size: 0.78rem; padding: 0.35rem 0.7rem;">
+                            <i data-lucide="folder-plus" style="width:14px;height:14px;"></i>
+                            <span>Add Folder</span>
+                        </button>
+                    </div>
+
+                    <!-- FOLDERS GRID WITH REFERENCE CARDS -->
+                    <div id="foldersGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">
+                        
+                        <!-- FOLDER CARD 1 -->
+                        <div class="card card-hover" style="padding: 1.1rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                    <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(37, 99, 235, 0.1); display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                        <i data-lucide="folder" style="width:18px;height:18px;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">Product Roadmap</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">4 documents</div>
+                                    </div>
+                                </div>
+                                <!-- FOLDER BUTTONS (PERMISSIONS, RENAME, DELETE) -->
+                                <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Folder Permissions: Product Roadmap')" title="Folder Permissions & Restrictions" aria-label="Permissions">
+                                        <i data-lucide="shield" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Rename Folder: Product Roadmap')" title="Rename Folder" aria-label="Rename">
+                                        <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Folder: Product Roadmap')" title="Delete Folder" aria-label="Delete">
+                                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <span class="badge badge-role" style="font-size: 0.72rem;">Personal Workspace</span>
+                                <span style="font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+                                    Open Folder <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- FOLDER CARD 2 -->
+                        <div class="card card-hover" style="padding: 1.1rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                    <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(147, 51, 234, 0.1); display: flex; align-items: center; justify-content: center; color: #9333ea;">
+                                        <i data-lucide="folder" style="width:18px;height:18px;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">Design Systems</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">2 documents</div>
+                                    </div>
+                                </div>
+                                <!-- FOLDER BUTTONS -->
+                                <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Folder Permissions: Design Systems')" title="Folder Permissions & Restrictions" aria-label="Permissions">
+                                        <i data-lucide="shield" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Rename Folder: Design Systems')" title="Rename Folder" aria-label="Rename">
+                                        <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Folder: Design Systems')" title="Delete Folder" aria-label="Delete">
+                                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <span class="badge badge-role" style="font-size: 0.72rem;">Personal Workspace</span>
+                                <span style="font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+                                    Open Folder <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- FOLDER CARD 3 -->
+                        <div class="card card-hover" style="padding: 1.1rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                    <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; color: #10b981;">
+                                        <i data-lucide="folder" style="width:18px;height:18px;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">Sprint 44 Specs</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">6 documents</div>
+                                    </div>
+                                </div>
+                                <!-- FOLDER BUTTONS -->
+                                <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Folder Permissions: Sprint 44 Specs')" title="Folder Permissions & Restrictions" aria-label="Permissions">
+                                        <i data-lucide="shield" style="width:14px;height:14px;color:var(--accent-primary);"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn" onclick="alert('Rename Folder: Sprint 44 Specs')" title="Rename Folder" aria-label="Rename">
+                                        <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Folder: Sprint 44 Specs')" title="Delete Folder" aria-label="Delete">
+                                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <span class="badge badge-role" style="font-size: 0.72rem;">Personal Workspace</span>
+                                <span style="font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+                                    Open Folder <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- DOCUMENTS SECTION WITH VISIBLE CARD ACTION BUTTONS -->
+                <!-- ========================================================================= -->
+                <div style="margin-bottom: 2.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">Documents</h2>
+                            <span class="badge" style="font-size: 0.7rem; font-weight: 700;">3</span>
+                        </div>
+                        <a href="#" onclick="alert('View all documents')" style="font-size: 0.82rem; color: var(--accent-primary); text-decoration: none; font-weight: 600;">View all</a>
+                    </div>
+
+                    <!-- DOCUMENTS GRID WITH REFERENCE CARDS -->
+                    <div id="docsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+                        
+                        <!-- DOCUMENT CARD 1 -->
+                        <div class="card card-hover" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px;" onclick="location.href='/views/editor.html'">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                                    <div class="icon-box-doc" style="width: 38px; height: 38px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+                                    </div>
+                                    <!-- DOCUMENT CARD ACTION BUTTONS -->
+                                    <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                        <span class="badge" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 700; background: rgba(37,99,235,0.1); color: var(--accent-primary);">
+                                            Doc
+                                        </span>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Toggled Star')" title="Star / Unstar" aria-label="Star">
+                                            <i data-lucide="star" style="width:14px;height:14px;fill:#f59e0b;color:#f59e0b;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Manage Tags')" title="Manage Tags" aria-label="Tags">
+                                            <i data-lucide="tag" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('File Permissions & Restrictions')" title="File Permissions & Restrictions" aria-label="Permissions">
+                                            <i data-lucide="shield" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Rename Document')" title="Rename Item" aria-label="Rename">
+                                            <i data-lucide="edit-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Document')" title="Delete Item" aria-label="Delete">
+                                            <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <h3 style="font-size: 0.96rem; font-weight: 600; margin-bottom: 0.25rem; line-height: 1.35; color: var(--text-primary); word-break: break-word;">System Architecture & RFC-7629 Specs</h3>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+                                    <span class="badge" style="background:#3b82f620; color:#3b82f6; border:1px solid #3b82f640; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Architecture</span>
+                                    <span class="badge" style="background:#10b98120; color:#10b981; border:1px solid #10b98140; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Production</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.65rem; margin-top: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+                                    <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                                    Updated 2 hours ago
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.2rem;">
+                                    Open Editor <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- DOCUMENT CARD 2 -->
+                        <div class="card card-hover" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px;" onclick="location.href='/views/editor.html'">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                                    <div class="icon-box-doc" style="width: 38px; height: 38px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+                                    </div>
+                                    <!-- DOCUMENT CARD ACTION BUTTONS -->
+                                    <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                        <span class="badge" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 700; background: rgba(37,99,235,0.1); color: var(--accent-primary);">
+                                            Doc
+                                        </span>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Toggled Star')" title="Star / Unstar" aria-label="Star">
+                                            <i data-lucide="star" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Manage Tags')" title="Manage Tags" aria-label="Tags">
+                                            <i data-lucide="tag" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('File Permissions & Restrictions')" title="File Permissions & Restrictions" aria-label="Permissions">
+                                            <i data-lucide="shield" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Rename Document')" title="Rename Item" aria-label="Rename">
+                                            <i data-lucide="edit-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Document')" title="Delete Item" aria-label="Delete">
+                                            <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <h3 style="font-size: 0.96rem; font-weight: 600; margin-bottom: 0.25rem; line-height: 1.35; color: var(--text-primary); word-break: break-word;">CRDT Collaborative Engine Protocol</h3>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+                                    <span class="badge" style="background:#8b5cf620; color:#8b5cf6; border:1px solid #8b5cf640; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Realtime</span>
+                                    <span class="badge" style="background:#f59e0b20; color:#f59e0b; border:1px solid #f59e0b40; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#CRDT</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.65rem; margin-top: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+                                    <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                                    Updated yesterday
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.2rem;">
+                                    Open Editor <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- DOCUMENT CARD 3 -->
+                        <div class="card card-hover" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px;" onclick="location.href='/views/editor.html'">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                                    <div class="icon-box-doc" style="width: 38px; height: 38px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+                                    </div>
+                                    <!-- DOCUMENT CARD ACTION BUTTONS -->
+                                    <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                        <span class="badge" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 700; background: rgba(37,99,235,0.1); color: var(--accent-primary);">
+                                            Doc
+                                        </span>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Toggled Star')" title="Star / Unstar" aria-label="Star">
+                                            <i data-lucide="star" style="width:14px;height:14px;fill:#f59e0b;color:#f59e0b;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Manage Tags')" title="Manage Tags" aria-label="Tags">
+                                            <i data-lucide="tag" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('File Permissions & Restrictions')" title="File Permissions & Restrictions" aria-label="Permissions">
+                                            <i data-lucide="shield" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Rename Document')" title="Rename Item" aria-label="Rename">
+                                            <i data-lucide="edit-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Document')" title="Delete Item" aria-label="Delete">
+                                            <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <h3 style="font-size: 0.96rem; font-weight: 600; margin-bottom: 0.25rem; line-height: 1.35; color: var(--text-primary); word-break: break-word;">Q3 Product Strategy & Growth Objectives</h3>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+                                    <span class="badge" style="background:#06b6d420; color:#06b6d4; border:1px solid #06b6d440; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Strategy</span>
+                                    <span class="badge" style="background:#ec489920; color:#ec4899; border:1px solid #ec489940; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Q3</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.65rem; margin-top: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+                                    <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                                    Updated 3 days ago
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.2rem;">
+                                    Open Editor <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- WHITEBOARDS SECTION WITH VISIBLE CARD ACTION BUTTONS -->
+                <!-- ========================================================================= -->
+                <div style="margin-bottom: 2.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">Whiteboards & Canvases</h2>
+                            <span class="badge" style="font-size: 0.7rem; font-weight: 700;">1</span>
+                        </div>
+                        <a href="#" onclick="alert('View all whiteboards')" style="font-size: 0.82rem; color: var(--accent-primary); text-decoration: none; font-weight: 600;">View all</a>
+                    </div>
+
+                    <!-- WHITEBOARDS GRID WITH REFERENCE CARDS -->
+                    <div id="whiteboardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+                        
+                        <!-- WHITEBOARD CARD 1 -->
+                        <div class="card card-hover" style="cursor: pointer; position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px;" onclick="location.href='/views/canvas.html'">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                                    <div class="icon-box-board" style="width: 38px; height: 38px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+                                        <i data-lucide="presentation" style="width:20px;height:20px;"></i>
+                                    </div>
+                                    <!-- WHITEBOARD CARD ACTION BUTTONS -->
+                                    <div style="display: flex; align-items: center; gap: 0.2rem;" onclick="event.stopPropagation()">
+                                        <span class="badge" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 700; background: rgba(147,51,234,0.1); color: #9333ea;">
+                                            Board
+                                        </span>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Toggled Star')" title="Star / Unstar" aria-label="Star">
+                                            <i data-lucide="star" style="width:14px;height:14px;fill:#f59e0b;color:#f59e0b;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Manage Tags')" title="Manage Tags" aria-label="Tags">
+                                            <i data-lucide="tag" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('File Permissions & Restrictions')" title="File Permissions & Restrictions" aria-label="Permissions">
+                                            <i data-lucide="shield" style="width:13px;height:13px;color:var(--accent-primary);"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn" onclick="alert('Rename Whiteboard')" title="Rename Item" aria-label="Rename">
+                                            <i data-lucide="edit-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                        <button class="btn btn-icon card-action-btn btn-icon-danger" onclick="alert('Delete Whiteboard')" title="Delete Item" aria-label="Delete">
+                                            <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <h3 style="font-size: 0.96rem; font-weight: 600; margin-bottom: 0.25rem; line-height: 1.35; color: var(--text-primary); word-break: break-word;">User Onboarding Journey Flowchart</h3>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+                                    <span class="badge" style="background:#9333ea20; color:#9333ea; border:1px solid #9333ea40; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#Design</span>
+                                    <span class="badge" style="background:#3b82f620; color:#3b82f6; border:1px solid #3b82f640; font-size:0.68rem; padding:1px 6px; border-radius:4px; font-weight:600;">#UX</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.65rem; margin-top: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+                                    <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                                    Updated yesterday
+                                </span>
+                                <span style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; display: flex; align-items: center; gap: 0.2rem;">
+                                    Open Canvas <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- SCRIPT TO INITIALIZE ICONS AND INTERACTION -->
+    <script>
+        function toggleWorkspaceMenu() {
+            const menu = document.getElementById('workspaceMenu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('workspaceMenu');
+            if (menu && !menu.classList.contains('hidden') && !e.target.closest('#sidebar')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Ensure icons are created immediately
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        });
+        setTimeout(() => {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        }, 100);
+    </script>
+</body>
+</html>

@@ -28,7 +28,33 @@ public class DataSourceConfig {
         String url = env.getProperty("spring.datasource.url");
         String username = env.getProperty("spring.datasource.username");
         String password = env.getProperty("spring.datasource.password");
-        String driver = env.getProperty("spring.datasource.driver-class-name");
+        String driver = env.getProperty("spring.datasource.driver-class-name", "org.postgresql.Driver");
+
+        if (url == null || url.isBlank()) {
+            String dbUrl = env.getProperty("DATABASE_URL", env.getProperty("DATABASE_PRIVATE_URL", env.getProperty("POSTGRES_URL")));
+            if (dbUrl != null && !dbUrl.isBlank()) {
+                if (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")) {
+                    try {
+                        java.net.URI uri = new java.net.URI(dbUrl);
+                        if (uri.getUserInfo() != null) {
+                            String[] userInfo = uri.getUserInfo().split(":", 2);
+                            if (username == null || username.isBlank()) username = userInfo[0];
+                            if (password == null || password.isBlank()) password = userInfo.length > 1 ? userInfo[1] : "";
+                        }
+                        int port = uri.getPort() != -1 ? uri.getPort() : 5432;
+                        String path = uri.getPath() != null && uri.getPath().length() > 1 ? uri.getPath().substring(1) : "syncpad_db";
+                        url = "jdbc:postgresql://" + uri.getHost() + ":" + port + "/" + path;
+                    } catch (Exception e) {
+                        log.warn("Failed to parse DATABASE_URL URI, falling back to string replacement: {}", e.getMessage());
+                        url = dbUrl.replaceFirst("^(postgres|postgresql)://", "jdbc:postgresql://");
+                    }
+                } else if (!dbUrl.startsWith("jdbc:")) {
+                    url = "jdbc:" + dbUrl;
+                } else {
+                    url = dbUrl;
+                }
+            }
+        }
 
         if (url != null) ds.setJdbcUrl(url);
         if (username != null) ds.setUsername(username);

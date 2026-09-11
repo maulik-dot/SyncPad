@@ -1,0 +1,545 @@
+            </main>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- MODALS & SIDE PANELS -->
+        <!-- ========================================================================= -->
+
+        <!-- TRASH ACTION CONFIRMATION MODAL -->
+        <div id="trashConfirmModal" class="modal-overlay hidden" style="z-index: 2100;">
+            <div class="modal-content" style="max-width: 440px; text-align: center; padding: 1.75rem;">
+                <div id="trashModalIconContainer" style="width: 52px; height: 52px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #ef4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                    <i id="trashModalIcon" data-lucide="alert-triangle" style="width: 26px; height: 26px;"></i>
+                </div>
+                <h3 id="trashModalTitle" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Permanently Delete?</h3>
+                <p id="trashModalMessage" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem;">
+                    This action cannot be undone. All versions and comments associated with this document will be permanently removed.
+                </p>
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                    <button type="button" onclick="closeTrashConfirmModal()" class="btn btn-outline" style="flex: 1; padding: 0.55rem 1rem;">
+                        Cancel
+                    </button>
+                    <button type="button" id="trashModalConfirmBtn" class="btn btn-primary" style="flex: 1; padding: 0.55rem 1rem; background: var(--danger); border-color: var(--danger);">
+                        Delete Permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAG MANAGEMENT MODAL -->
+        <div id="tagManagementModal" class="modal-overlay hidden" style="z-index: 2200;">
+            <div class="modal-content" style="max-width: 480px; padding: 1.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="tag" style="width: 18px; height: 18px;"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">Manage Tags</h3>
+                            <p id="tagModalDocTitle" style="font-size: 0.78rem; color: var(--text-muted); margin: 0.1rem 0 0;"></p>
+                        </div>
+                    </div>
+                    <button class="btn btn-icon" onclick="closeTagModal()" title="Close" aria-label="Close">
+                        <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+                    </button>
+                </div>
+
+                <!-- Assigned tags -->
+                <div style="margin-bottom: 1.25rem;">
+                    <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 0.4rem;">Assigned Document Tags</label>
+                    <div id="tagModalCurrentTags" style="display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 40px; padding: 0.6rem; background: var(--bg-surface-sunken); border-radius: var(--radius-sm); border: 1px solid var(--border-color); align-items: center;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">No tags assigned</span>
+                    </div>
+                </div>
+
+                <!-- Add / Create tag form -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1.25rem; margin-bottom: 1rem;">
+                    <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 0.4rem;">Attach or Create Tag</label>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <input type="text" id="newTagNameInput" class="input" placeholder="e.g. roadmap, urgent, architecture..." style="flex: 1; height: 38px; font-size: 0.85rem;" onkeydown="if(event.key==='Enter') addTagFromModal()">
+                        <input type="color" id="newTagColorInput" value="#3b82f6" style="width: 40px; height: 38px; padding: 2px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface);" title="Choose Tag Color">
+                        <button class="btn btn-primary" onclick="addTagFromModal()" style="height: 38px; padding: 0 1rem; display: flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+                            <i data-lucide="plus" style="width: 15px; height: 15px;"></i> Attach
+                        </button>
+                    </div>
+
+                    <!-- Available workspace tags suggestion pills -->
+                    <div id="tagModalSuggestedContainer">
+                        <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Workspace Tag Suggestions:</span>
+                        <div id="tagModalSuggestedTags" style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                            <!-- populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <button class="btn btn-secondary" onclick="closeTagModal()">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CREATE NEW ITEM MODAL (DOC / WHITEBOARD / FOLDER) -->
+        <div id="createModal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <h2>Create New Item</h2>
+                    <button class="btn btn-icon" onclick="closeCreateModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div class="card card-hover" onclick="submitCreateWorkspaceItem('DOC')" style="text-align: center; padding: 1.5rem 0.75rem; cursor: pointer;">
+                        <div class="icon-box-doc" style="width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                            <i data-lucide="file-text" style="width:24px;height:24px;"></i>
+                        </div>
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.2rem;">Document</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">Rich text & notes</p>
+                    </div>
+                    <div class="card card-hover" onclick="closeCreateModal(); openTemplatesModal();" style="text-align: center; padding: 1.5rem 0.75rem; cursor: pointer;">
+                        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.1); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                            <i data-lucide="layout-template" style="width:24px;height:24px;"></i>
+                        </div>
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.2rem;">Template</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">From blueprints</p>
+                    </div>
+                    <div class="card card-hover" onclick="submitCreateWorkspaceItem('WHITEBOARD')" style="text-align: center; padding: 1.5rem 0.75rem; cursor: pointer;">
+                        <div class="icon-box-board" style="width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                            <i data-lucide="presentation" style="width:24px;height:24px;"></i>
+                        </div>
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.2rem;">Whiteboard</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">Canvas & diagrams</p>
+                    </div>
+                    <div class="card card-hover" onclick="closeCreateModal(); openCreateFolderModal();" style="text-align: center; padding: 1.5rem 0.75rem; cursor: pointer;">
+                        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--bg-hover); color: var(--text-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                            <i data-lucide="folder-plus" style="width:24px;height:24px;"></i>
+                        </div>
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.2rem;">Folder</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">Organize files</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CREATE NEW WORKSPACE CONTAINER MODAL -->
+        <div id="newWorkspaceModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 440px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <h2>Create New Workspace</h2>
+                    <button class="btn btn-icon" onclick="closeNewWorkspaceContainerModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+                <form onsubmit="handleCreateWorkspaceSubmit(event)">
+                    <div class="input-group">
+                        <label class="input-label">Workspace Name</label>
+                        <input type="text" id="wsNameInput" class="input" placeholder="e.g. Engineering Team" required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Description (Optional)</label>
+                        <input type="text" id="wsDescInput" class="input" placeholder="e.g. Frontend & Backend projects">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeNewWorkspaceContainerModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Workspace</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- CREATE FOLDER MODAL -->
+        <div id="createFolderModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 420px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <h2>Create Folder</h2>
+                    <button class="btn btn-icon" onclick="closeCreateFolderModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+                <form onsubmit="handleCreateFolderSubmit(event)">
+                    <div class="input-group">
+                        <label class="input-label">Folder Name</label>
+                        <input type="text" id="folderNameInput" class="input" placeholder="e.g. Architecture Docs" required>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeCreateFolderModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Folder</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- CREATE ITEM IN ACTIVE FOLDER MODAL -->
+        <div id="createInFolderModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 450px; padding: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <div>
+                        <h2 id="createInFolderModalTitle" style="font-size: 1.2rem; font-weight: 700;">Add Item to Folder</h2>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">Choose item type and provide a title</p>
+                    </div>
+                    <button class="btn btn-icon" onclick="closeCreateInFolderModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+                <form onsubmit="handleCreateInFolderSubmit(event)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+                        <div id="folderChoiceDoc" class="type-choice-card selected" onclick="selectFolderModalType('DOC')">
+                            <div class="icon-box-doc" style="width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem;">
+                                <i data-lucide="file-text" style="width:18px;height:18px;"></i>
+                            </div>
+                            <div style="font-weight: 600; font-size: 0.86rem; margin-bottom: 0.15rem;">Document</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Rich notes & specs</div>
+                        </div>
+                        <div id="folderChoiceBoard" class="type-choice-card" onclick="selectFolderModalType('WHITEBOARD')">
+                            <div class="icon-box-board" style="width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem;">
+                                <i data-lucide="presentation" style="width:18px;height:18px;"></i>
+                            </div>
+                            <div style="font-weight: 600; font-size: 0.86rem; margin-bottom: 0.15rem;">Whiteboard</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">Visual diagramming</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="folderItemTypeSelect" value="DOC">
+                    <div class="input-group">
+                        <label class="input-label">Title</label>
+                        <input type="text" id="folderItemTitleInput" class="input" placeholder="e.g. Sprint Architecture Specs" required>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeCreateInFolderModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create & Open</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- RENAME ITEM MODAL -->
+        <div id="renameModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 420px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                    <h2 id="renameModalTitle">Rename Item</h2>
+                    <button class="btn btn-icon" onclick="closeRenameModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+                <form onsubmit="handleRenameSubmit(event)">
+                    <div class="input-group">
+                        <label class="input-label">New Title / Name</label>
+                        <input type="text" id="renameInput" class="input" required>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeRenameModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- WORKSPACE COLLABORATION & SHARE MODAL -->
+        <div id="workspaceShareModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 540px; padding: 0; overflow: hidden; border-radius: var(--radius-lg); position: relative;">
+                <!-- ACCENT STRIPE -->
+                <div style="height: 3px; background: linear-gradient(90deg, #2563eb, #8b5cf6, #ec4899);"></div>
+                
+                <div style="padding: 1.5rem 1.75rem;">
+                    <!-- HEADER -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.65rem;">
+                            <div id="wsShareAvatar" class="avatar" style="width:34px;height:34px;font-size:0.9rem;background:#2563eb;">W</div>
+                            <div>
+                                <h2 style="font-size: 1.15rem; font-weight: 700; line-height: 1.2;">Workspace Collaboration</h2>
+                                <div id="wsShareSubtitle" style="font-size: 0.76rem; color: var(--text-muted);">Manage members and invite collaborators</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-icon" onclick="closeWorkspaceShareModal()" title="Close" aria-label="Close">
+                            <i data-lucide="x" style="width:18px;height:18px;"></i>
+                        </button>
+                    </div>
+
+                    <!-- INVITE BOX -->
+                    <div id="wsInviteBox" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.1rem; margin-bottom: 1.5rem;">
+                        <label class="input-label" style="font-weight: 600; font-size: 0.82rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                            <i data-lucide="user-plus" style="width:14px;height:14px;color:var(--primary);"></i>
+                            <span>Invite collaborator</span>
+                        </label>
+                        
+                        <div style="margin-bottom: 0.75rem;">
+                            <div class="tabs" style="display: flex; width: 100%;">
+                                <button type="button" class="tab-item ws-role-tab active" onclick="selectWorkspaceInviteRole('EDITOR', this)" style="flex: 1; justify-content: center; padding: 0.4rem 0.5rem; gap: 0.4rem;">
+                                    <i data-lucide="edit-3" style="width:13px;height:13px;"></i>
+                                    <span>Editor</span>
+                                </button>
+                                <button type="button" class="tab-item ws-role-tab" onclick="selectWorkspaceInviteRole('ADMIN', this)" style="flex: 1; justify-content: center; padding: 0.4rem 0.5rem; gap: 0.4rem;">
+                                    <i data-lucide="shield-check" style="width:13px;height:13px;"></i>
+                                    <span>Admin</span>
+                                </button>
+                                <button type="button" class="tab-item ws-role-tab" onclick="selectWorkspaceInviteRole('VIEWER', this)" style="flex: 1; justify-content: center; padding: 0.4rem 0.5rem; gap: 0.4rem;">
+                                    <i data-lucide="eye" style="width:13px;height:13px;"></i>
+                                    <span>Viewer</span>
+                                </button>
+                            </div>
+                            <input type="hidden" id="wsInviteRole" value="EDITOR">
+                        </div>
+
+                        <div style="display: flex; gap: 0.6rem;">
+                            <div style="position: relative; flex: 1;">
+                                <i data-lucide="mail" style="position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--text-muted); pointer-events: none;"></i>
+                                <input type="email" id="wsInviteEmail" class="input" placeholder="teammate@company.com" style="padding-left: 2.75rem; font-size: 0.92rem; height: 44px; border-radius: var(--radius-md);">
+                            </div>
+                            <button class="btn btn-primary" onclick="submitWorkspaceInvite()" style="font-size: 0.86rem; font-weight: 600; padding: 0 1.25rem; display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; height: 44px; border-radius: var(--radius-md);">
+                                <i data-lucide="send" style="width:14px;height:14px;"></i>
+                                <span>Send Invite</span>
+                            </button>
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="info" style="width:12px;height:12px;"></i>
+                            <span>The invitee will receive a real-time notification with Accept / Decline options.</span>
+                        </div>
+                    </div>
+
+                    <!-- MEMBERS LIST SECTION -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                            <label class="input-label" style="font-weight: 600; font-size: 0.82rem; margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                                <i data-lucide="users" style="width:14px;height:14px;color:var(--primary);"></i>
+                                <span>Workspace Collaborators</span>
+                            </label>
+                            <span id="wsMembersCountBadge" class="notif-badge-pill role" style="font-size: 0.68rem;">1 member</span>
+                        </div>
+                        <div id="wsMembersList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 240px; overflow-y: auto; padding-right: 0.25rem;">
+                            <!-- Members dynamically rendered -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCUMENT SHARE & RESTRICTION ACCESS MODAL -->
+        <div id="shareModal" class="modal-overlay hidden">
+            <div class="modal-content access-modal-card doc-collab-modal-card" style="max-width: 560px; padding: 0; overflow: hidden; border-radius: var(--radius-lg); position: relative;">
+                <!-- ACCENT STRIPE -->
+                <div style="height: 3px; background: linear-gradient(90deg, #2563eb, #8b5cf6, #ec4899);"></div>
+
+                <div style="padding: 1.5rem 1.75rem;">
+                    <!-- HEADER -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div id="docShareAvatar" class="avatar" style="width: 38px; height: 38px; font-size: 0.95rem; background: linear-gradient(135deg, #2563eb, #8b5cf6); color: #fff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25); display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md);">
+                                <i data-lucide="shield-check" style="width: 20px; height: 20px;"></i>
+                            </div>
+                            <div>
+                                <h2 id="shareModalTitle" style="font-size: 1.15rem; font-weight: 700; line-height: 1.25; color: var(--text-primary);">Document Access & Permissions</h2>
+                                <div id="shareModalSubtitle" style="font-size: 0.76rem; color: var(--text-muted); margin-top: 1px;">Manage collaborator access and permissions for this document</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-icon" onclick="closeShareModal()" title="Close" aria-label="Close">
+                            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+
+                    <!-- INVITE COLLABORATOR CARD BOX -->
+                    <div id="docInviteBox" class="doc-invite-box" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.15rem; margin-bottom: 1.35rem;">
+                        <label class="input-label" style="font-weight: 600; font-size: 0.82rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+                            <i data-lucide="user-plus" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+                            <span>Invite collaborator</span>
+                        </label>
+
+                        <!-- ROLE SELECTION TABS -->
+                        <div style="margin-bottom: 0.85rem;">
+                            <div class="tabs doc-role-tabs" style="display: flex; width: 100%; gap: 4px; background: var(--bg-hover); padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                <button type="button" class="tab-item doc-role-tab active" onclick="selectDocShareRole('EDITOR', this)" style="flex: 1; justify-content: center; padding: 0.5rem 0.6rem; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all 0.15s ease;">
+                                    <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                                    <span>Editor</span>
+                                </button>
+                                <button type="button" class="tab-item doc-role-tab" onclick="selectDocShareRole('COMMENTER', this)" style="flex: 1; justify-content: center; padding: 0.5rem 0.6rem; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all 0.15s ease;">
+                                    <i data-lucide="message-square" style="width: 14px; height: 14px;"></i>
+                                    <span>Commenter</span>
+                                </button>
+                                <button type="button" class="tab-item doc-role-tab" onclick="selectDocShareRole('VIEWER', this)" style="flex: 1; justify-content: center; padding: 0.5rem 0.6rem; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all 0.15s ease;">
+                                    <i data-lucide="eye" style="width: 14px; height: 14px;"></i>
+                                    <span>Viewer</span>
+                                </button>
+                            </div>
+                            <!-- Hidden input preserving API compatibility -->
+                            <input type="hidden" id="shareRoleSelect" value="EDITOR">
+                        </div>
+
+                        <!-- USERNAME / EMAIL INPUT TAB (ENLARGED) -->
+                        <div style="position: relative; margin-bottom: 0.75rem;">
+                            <i data-lucide="user" style="position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-muted); pointer-events: none; z-index: 2;"></i>
+                            <input type="text" id="shareEmailInput" class="input doc-username-input" placeholder="Enter collaborator username or email address..." autocomplete="off" spellcheck="false" style="width: 100%; height: 46px; padding-left: 2.85rem; padding-right: 1rem; font-size: 0.92rem; font-weight: 500; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); transition: all 0.15s ease;">
+                            <!-- Autocomplete Suggestions container -->
+                            <div id="docShareUserSuggestions" class="doc-share-suggestions hidden"></div>
+                        </div>
+
+                        <!-- DURATION & ACTION BUTTON ROW -->
+                        <div style="display: flex; gap: 0.6rem; align-items: center;">
+                            <div style="position: relative; flex: 1;">
+                                <select id="shareDurationSelect" class="app-select" style="width: 100%; height: 38px; font-size: 0.82rem; font-weight: 500; border-radius: var(--radius-sm); padding: 0 0.75rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color);" title="Access Duration">
+                                    <option value="0">Permanent Access</option>
+                                    <option value="24">24 Hours (Guest Pass)</option>
+                                    <option value="168">7 Days Access</option>
+                                    <option value="720">30 Days Access</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="submitShareInvite()" style="height: 38px; font-size: 0.84rem; font-weight: 600; padding: 0 1.25rem; display: flex; align-items: center; gap: 0.45rem; border-radius: var(--radius-sm); white-space: nowrap;">
+                                <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+                                <span>Invite</span>
+                            </button>
+                        </div>
+
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.55rem; display: flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="info" style="width: 13px; height: 13px; flex-shrink: 0;"></i>
+                            <span>Collaborators gain immediate document access with real-time sync.</span>
+                        </div>
+                    </div>
+
+                    <!-- WORKSPACE COLLABORATORS & RESTRICTIONS LIST -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                            <label class="input-label" style="font-weight: 600; font-size: 0.82rem; margin: 0; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+                                <i data-lucide="users" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                                <span>Document Collaborators & Permissions</span>
+                            </label>
+                            <span id="docMembersCountBadge" class="notif-badge-pill role" style="font-size: 0.68rem;">Workspace Members</span>
+                        </div>
+                        <div id="docPermissionsList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 230px; overflow-y: auto; padding-right: 0.25rem;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PUBLIC SHARE LINK SECTION -->
+                <div style="border-top: 1px solid var(--border-color); padding: 1.15rem 1.75rem; background: var(--bg-hover);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(37, 99, 235, 0.1); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <i data-lucide="globe" style="width: 18px; height: 18px;"></i>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.86rem; font-weight: 650; color: var(--text-primary); line-height: 1.2;">Public Share Link</div>
+                                <div id="docPublicLinkStatusText" style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">Anyone with the link can view or collaborate</div>
+                            </div>
+                        </div>
+                        <label class="switch-toggle" title="Toggle public link access">
+                            <input type="checkbox" id="docPublicLinkToggle" onchange="togglePublicShareLink(this.checked)">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- EXPANDABLE ACTIVE LINK CONTROLS -->
+                    <div id="docPublicLinkDetails" class="doc-share-link-box hidden">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                            <label style="font-size: 0.74rem; font-weight: 600; color: var(--text-secondary); margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="shield" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+                                <span>Access Permission:</span>
+                            </label>
+                            <select id="docPublicLinkRole" onchange="updatePublicShareLinkRole(this.value)" class="access-role-select" style="min-width: 115px; height: 30px; font-size: 0.75rem;" title="Public Link Role">
+                                <option value="VIEWER" selected>Viewer</option>
+                                <option value="COMMENTER">Commenter</option>
+                                <option value="EDITOR">Editor</option>
+                            </select>
+                        </div>
+                        <div class="doc-share-link-row">
+                            <input type="text" id="docPublicLinkInput" class="doc-share-link-input" readonly placeholder="Generating share link..." onclick="this.select()">
+                            <button type="button" class="btn btn-primary btn-sm" id="copyShareLinkBtn" onclick="copyShareLink()" style="height: 34px; padding: 0 0.95rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; border-radius: var(--radius-sm);">
+                                <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                                <span id="copyShareLinkBtnText">Copy Link</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOLDER ACCESS & RESTRICTION MODAL -->
+        <div id="folderAccessModal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 520px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <h2 id="folderAccessModalTitle" style="font-size: 1.2rem; font-weight: 700;">Folder Access & Restrictions</h2>
+                        <p id="folderAccessModalSubtitle" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Control collaborator access for this folder and all files inside it.</p>
+                    </div>
+                    <button class="btn btn-icon" onclick="closeFolderAccessModal()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+                </div>
+
+                <div style="margin-bottom: 1.25rem; padding: 0.65rem 0.85rem; background: rgba(37,99,235,0.06); border-left: 3px solid var(--accent-primary); border-radius: 4px; font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4;">
+                    <strong style="color: var(--accent-primary);">Workspace Inheritance:</strong> All workspace members have access by default. Workspace Admins can restrict specific users from seeing or opening this folder.
+                </div>
+
+                <!-- Folder Members Access List -->
+                <div style="margin-bottom: 1.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem; background: var(--bg-hover);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                        <div style="font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="shield" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                            <span>Collaborator Access Levels</span>
+                        </div>
+                    </div>
+                    <div id="folderPermissionsList" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.45rem;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary btn-sm" onclick="closeFolderAccessModal()">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMMENTS & DISCUSSION SIDEBAR -->
+        <div id="commentsSidebar" class="sidebar hidden" style="width: 360px; position: fixed; right: 0; top: 95px; bottom: 32px; z-index: 80; background: var(--bg-surface); box-shadow: var(--shadow-xl); border-top: 1px solid var(--border-color); border-left: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div class="sidebar-header" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="message-square" style="width: 18px; height: 18px; color: var(--accent-primary);"></i>
+                    <h3 style="font-size: 1rem; font-weight: 700;">Comments & Discussion</h3>
+                </div>
+                <button class="btn btn-icon" onclick="toggleCommentsSidebar()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+            </div>
+
+            <!-- Filter Tabs: All, Open, Resolved -->
+            <div class="comment-filter-segmented">
+                <button class="comment-filter-tab active" id="commentFilterAll" onclick="filterComments('all')">
+                    <span>All</span>
+                    <span class="comment-count-badge" id="allCommentCount">0</span>
+                </button>
+                <button class="comment-filter-tab" id="commentFilterOpen" onclick="filterComments('open')">
+                    <span>Open</span>
+                    <span class="comment-count-badge" id="openCommentCount">0</span>
+                </button>
+                <button class="comment-filter-tab" id="commentFilterResolved" onclick="filterComments('resolved')">
+                    <span>Resolved</span>
+                    <span class="comment-count-badge" id="resolvedCommentCount">0</span>
+                </button>
+            </div>
+
+            <!-- Comment list container -->
+            <div id="docCommentsContainer" style="flex: 1; overflow-y: auto; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.85rem;">
+                <!-- Threaded comments rendered dynamically -->
+            </div>
+
+            <!-- Add New Comment Section -->
+            <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-surface);">
+                <!-- Active anchor text indicator -->
+                <div id="activeAnchorPreview" class="hidden" style="margin-bottom: 0.5rem; padding: 0.4rem 0.6rem; background: rgba(37,99,235,0.08); border-left: 3px solid var(--accent-primary); border-radius: 3px; font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between;">
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">
+                        <span style="font-weight: 600; color: var(--accent-primary);">Anchor:</span> "<span id="activeAnchorText"></span>"
+                    </div>
+                    <button onclick="clearActiveAnchor()" class="btn btn-icon" style="width: 18px; height: 18px;" title="Remove text anchor"><i data-lucide="x" style="width: 12px; height: 12px;"></i></button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <textarea id="newCommentInput" class="input" placeholder="Add a comment or feedback..." rows="2" style="font-size: 0.82rem; resize: none;"></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <button class="btn btn-outline btn-sm" onclick="captureSelectionForComment()" style="gap: 0.35rem; font-size: 0.75rem; padding: 0.25rem 0.5rem;" title="Anchor to selected document text">
+                            <i data-lucide="quote" style="width: 13px; height: 13px;"></i>
+                            <span>Anchor Selection</span>
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="submitDocComment()" style="gap: 0.35rem; padding: 0.35rem 0.75rem;">
+                            <i data-lucide="send" style="width: 13px; height: 13px;"></i>
+                            <span>Comment</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ACTIVITY & AUDIT TRAIL SIDEBAR -->
+        <div id="activitySidebar" class="sidebar hidden" style="width: 380px; position: fixed; right: 0; top: 95px; bottom: 32px; z-index: 80; background: var(--bg-surface); box-shadow: var(--shadow-xl); border-top: 1px solid var(--border-color); border-left: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div class="sidebar-header" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="activity" style="width: 18px; height: 18px; color: var(--accent-primary);"></i>
+                    <h3 style="font-size: 1rem; font-weight: 700;">Activity & Audit Trail</h3>
+                </div>
+                <button class="btn btn-icon" onclick="toggleActivitySidebar()" title="Close" aria-label="Close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+            </div>
+
+            <!-- Scope Toggle: Document Activity vs Workspace Activity -->
+            <div class="comment-filter-segmented" style="margin: 0.75rem 1.25rem 0.25rem;">
+                <button class="comment-filter-tab active" id="activityScopeDoc" onclick="switchActivityScope('document')">

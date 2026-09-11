@@ -44,9 +44,16 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
   // Modals
   const [shareEmail, setShareEmail] = useState('')
   const [shareRole, setShareRole] = useState<Role>('EDITOR')
+  const [shareDurationHours, setShareDurationHours] = useState<number>(0)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [shareLinkUrl, setShareLinkUrl] = useState<string | null>(null)
+  const [isPublicLinkEnabled, setIsPublicLinkEnabled] = useState(false)
+  const [publicLinkRole, setPublicLinkRole] = useState<Role>('VIEWER')
+  const [publicShareToken, setPublicShareToken] = useState<string | null>(null)
+  const [docPermissions, setDocPermissions] = useState<any[]>([])
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [shareInviteLoading, setShareInviteLoading] = useState(false)
   const [showNewFolderModal, setShowNewFolderModal] = useState(false)
   const [showNewDocModal, setShowNewDocModal] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
@@ -348,25 +355,127 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
     }
   }
 
+  useEffect(() => {
+    if (showShareModal && activeDoc?.id) {
+      documentService.getActiveShareLink(activeDoc.id).then(res => {
+        if (res && res.token && res.active) {
+          setIsPublicLinkEnabled(true)
+          setPublicShareToken(res.token)
+          setPublicLinkRole((res.role || 'VIEWER') as Role)
+          setShareLinkUrl(`${window.location.origin}/share/${res.token}`)
+        } else {
+          setIsPublicLinkEnabled(false)
+          setPublicShareToken(null)
+          setShareLinkUrl(null)
+        }
+      }).catch(() => {
+        setIsPublicLinkEnabled(false)
+        setPublicShareToken(null)
+        setShareLinkUrl(null)
+      })
+
+      documentService.getDocumentPermissions(activeDoc.id).then(perms => {
+        setDocPermissions(perms || [])
+      }).catch(() => {
+        setDocPermissions([])
+      })
+    }
+  }, [showShareModal, activeDoc?.id])
+
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!shareEmail.trim() || !activeDoc?.id) return
+    setShareInviteLoading(true)
     try {
       await documentService.shareDocument(activeDoc.id, shareEmail.trim(), shareRole)
       alert(`Shared document with ${shareEmail} as ${shareRole}`)
+      await documentService.shareDocument(
+        activeDoc.id,
+        shareEmail.trim(),
+        shareRole,
+        shareDurationHours > 0 ? shareDurationHours : null
+      )
       setShareEmail('')
+      const perms = await documentService.getDocumentPermissions(activeDoc.id)
+      setDocPermissions(perms || [])
     } catch (err: any) {
       alert(err.message || 'Share failed')
+    } finally {
+      setShareInviteLoading(false)
     }
   }
 
   const handleGenerateShareLink = async () => {
+  const handleTogglePublicLink = async (enabled: boolean) => {
+    if (!activeDoc?.id) return
+    setIsPublicLinkEnabled(enabled)
+    if (enabled) {
+      try {
+        const res = await documentService.generateShareLink(activeDoc.id, publicLinkRole, 7)
+        if (res && res.token) {
+          setPublicShareToken(res.token)
+          setShareLinkUrl(`${window.location.origin}/share/${res.token}`)
+        }
+      } catch (err: any) {
+        alert(err.message || 'Failed to generate link')
+        setIsPublicLinkEnabled(false)
+      }
+    } else if (publicShareToken) {
+      try {
+        await documentService.revokeShareLink(publicShareToken)
+        setPublicShareToken(null)
+        setShareLinkUrl(null)
+      } catch (err: any) {
+        console.warn('Failed to revoke link:', err)
+      }
+    }
+  }
+
+  const handleUpdatePublicLinkRole = async (newRole: Role) => {
+    if (!activeDoc?.id) return
+    setPublicLinkRole(newRole)
+    if (isPublicLinkEnabled) {
+      try {
+        const res = await documentService.generateShareLink(activeDoc.id, newRole, 7)
+        if (res && res.token) {
+          setPublicShareToken(res.token)
+          setShareLinkUrl(`${window.location.origin}/share/${res.token}`)
+        }
+      } catch (err: any) {
+        alert(err.message || 'Failed to update link role')
+      }
+    }
+  }
+
+  const handleCopyLink = () => {
+    if (!shareLinkUrl) return
+    navigator.clipboard.writeText(shareLinkUrl)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  const handleChangePermissionRole = async (email: string, newRole: Role) => {
     if (!activeDoc?.id) return
     try {
       const res = await documentService.generateShareLink(activeDoc.id, 'VIEWER', 7)
       setShareLinkUrl(window.location.origin + res.url)
+      await documentService.shareDocument(activeDoc.id, email, newRole)
+      const perms = await documentService.getDocumentPermissions(activeDoc.id)
+      setDocPermissions(perms || [])
     } catch (err: any) {
       alert(err.message || 'Failed to generate link')
+      alert(err.message || 'Failed to update permission')
+    }
+  }
+
+  const handleRemovePermission = async (userId: number | string) => {
+    if (!activeDoc?.id) return
+    try {
+      await documentService.removeDocumentPermission(activeDoc.id, userId)
+      const perms = await documentService.getDocumentPermissions(activeDoc.id)
+      setDocPermissions(perms || [])
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove collaborator')
     }
   }
 
@@ -419,9 +528,17 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
             <span 
               onClick={handleOpenMembers}
               className="text-xs font-semibold px-2 py-0.5 rounded bg-[#252525] text-blue-400 cursor-pointer hover:bg-[#303030] transition-colors"
+              className="text-xs font-semibold px-2.5 py-1 rounded bg-[#252525] text-blue-400 cursor-pointer hover:bg-[#303030] transition-colors flex items-center gap-1.5"
               title="Click to view workspace members"
             >
               {currentWorkspace?.name || 'Workspace'} 👥
+              <span>{currentWorkspace?.name || 'Workspace'}</span>
+              <svg className="w-3.5 h-3.5 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
             </span>
             {activeDoc && (
               <input
@@ -566,8 +683,10 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
               onClick={() => setShowNewFolderModal(true)}
               className="text-xs text-[#888] hover:text-white px-2 py-0.5 rounded bg-[#222] transition-colors"
               title="Create new folder"
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
             >
               + Folder
+              + New
             </button>
           </div>
 
@@ -580,6 +699,9 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
               }`}
             >
               <span>📁</span>
+              <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
               <span className="truncate">All Files & Documents</span>
             </button>
             {folders.map(f => (
@@ -591,6 +713,9 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
                 }`}
               >
                 <span>📂</span>
+                <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
                 <span className="truncate">{f.name}</span>
               </button>
             ))}
@@ -618,9 +743,11 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
               .filter(d => !selectedFolder || d.folderId === selectedFolder.id)
               .map(docItem => (
                 <button
+                <div
                   key={docItem.id}
                   onClick={() => selectDocument(docItem.id)}
                   className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors ${
+                  className={`group w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                     activeDoc?.id === docItem.id
                       ? 'bg-[#252525] text-white font-medium border border-[#333]'
                       : 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'
@@ -629,6 +756,25 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
                   <span className={`w-2 h-2 rounded-full shrink-0 ${docItem.fileType === 'PDF' ? 'bg-red-500' : 'bg-blue-500'}`} />
                   <span className="truncate flex-1">{docItem.title}</span>
                 </button>
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${docItem.fileType === 'PDF' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                    <span className="truncate">{docItem.title}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      selectDocument(docItem.id)
+                      setShowShareModal(true)
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#333] text-gray-400 hover:text-blue-400 transition-all shrink-0 cursor-pointer"
+                    title="Share Document"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             {documents.length === 0 && (
               <p className="text-[11px] text-[#555] px-2 py-3 text-center">No documents found</p>
@@ -926,7 +1072,200 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
                   onChange={e => setShareEmail(e.target.value)}
                   className="w-full h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm placeholder:text-[#444] outline-none focus:border-[#444]"
                 />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowShareModal(false)}>
+          <div className="bg-[#161616] border border-[#2a2a2a] rounded-2xl w-full max-w-[540px] shadow-2xl overflow-hidden relative" onClick={e => e.stopPropagation()}>
+            {/* Top Accent Gradient Stripe */}
+            <div className="h-[3px] bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500" />
+
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center shadow-md">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white leading-tight">
+                      {activeDoc?.title ? `Share: ${activeDoc.title}` : 'Share Document'}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Invite collaborators and manage public share links
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#252525] transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
+
+              {/* Invite Box */}
+              <div className="bg-[#1c1c1c] border border-[#2a2a2a] rounded-xl p-4 mb-5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+                  <svg className="w-3.5 h-3.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
+                  </svg>
+                  <span>Invite Collaborator</span>
+                </div>
+
+                {/* Role Pill Tabs */}
+                <div className="flex gap-1.5 bg-[#141414] p-1 rounded-lg border border-[#262626] mb-3">
+                  {(['EDITOR', 'COMMENTER', 'VIEWER'] as Role[]).map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setShareRole(r)}
+                      className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer text-center ${
+                        shareRole === r
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-400 hover:text-white hover:bg-[#222]'
+                      }`}
+                    >
+                      {r === 'EDITOR' ? 'Editor' : r === 'COMMENTER' ? 'Commenter' : 'Viewer'}
+                    </button>
+                  ))}
+                </div>
+
+                <form onSubmit={handleShare} className="space-y-3">
+                  {/* Enlarged Input with User Icon */}
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter collaborator username or email address..."
+                      value={shareEmail}
+                      onChange={e => setShareEmail(e.target.value)}
+                      className="w-full h-11 pl-10 pr-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-white text-sm placeholder:text-gray-500 outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all"
+                    />
+                  </div>
+
+                  {/* Duration Selector & Send Invite */}
+                  <div className="flex gap-2">
+                    <select
+                      value={shareDurationHours}
+                      onChange={e => setShareDurationHours(Number(e.target.value))}
+                      className="flex-1 h-10 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-xs font-medium text-gray-300 outline-none focus:border-[#444] cursor-pointer"
+                      title="Access Duration"
+                    >
+                      <option value="0">Permanent</option>
+                      <option value="24">24 Hours Guest Pass</option>
+                      <option value="168">7 Days Access</option>
+                      <option value="720">30 Days Access</option>
+                    </select>
+
+                    <button
+                      type="submit"
+                      disabled={shareInviteLoading}
+                      className="h-10 px-5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                      </svg>
+                      <span>{shareInviteLoading ? 'Inviting...' : 'Invite'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Public Share Link Section */}
+              <div className="border border-[#262626] rounded-xl p-4 mb-5 bg-[#181818]/60">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-white leading-tight">Public Share Link</div>
+                      <div className="text-[11px] text-gray-400">
+                        {isPublicLinkEnabled
+                          ? `Anyone with this link can ${publicLinkRole === 'EDITOR' ? 'edit' : publicLinkRole === 'COMMENTER' ? 'comment on' : 'view'} this document`
+                          : 'Enable link to share with anyone outside your workspace'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Slider Toggle Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isPublicLinkEnabled}
+                      onChange={e => handleTogglePublicLink(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5.5 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {/* Expanded Link Controls */}
+                {isPublicLinkEnabled && (
+                  <div className="mt-3.5 pt-3 border-t border-[#262626] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-gray-400">Link Role Access</span>
+                      <select
+                        value={publicLinkRole}
+                        onChange={e => handleUpdatePublicLinkRole(e.target.value as Role)}
+                        className="h-7 px-2 bg-[#121212] border border-[#2e2e2e] rounded-md text-xs text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
+                        title="Public Link Role"
+                      >
+                        <option value="VIEWER">Viewer</option>
+                        <option value="COMMENTER">Commenter</option>
+                        <option value="EDITOR">Editor</option>
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={shareLinkUrl || 'Generating link...'}
+                        onClick={e => (e.target as HTMLInputElement).select()}
+                        className="flex-1 h-9 px-3 bg-[#111] border border-[#2a2a2a] rounded-lg text-xs text-gray-300 outline-none select-all font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className={`h-9 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                          copiedLink
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white'
+                        }`}
+                      >
+                        {copiedLink ? (
+                          <>
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Collaborators & Permissions List */}
               <div>
                 <label className="block text-xs font-medium text-[#777] uppercase tracking-wider mb-1.5">Permission Role</label>
                 <select
@@ -937,6 +1276,85 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
                   <option value="EDITOR">Editor (Can edit)</option>
                   <option value="VIEWER">Viewer (Read-only)</option>
                 </select>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <span>Collaborators & Permissions</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-gray-400 bg-[#222] px-2 py-0.5 rounded-full">
+                    {docPermissions.length} {docPermissions.length === 1 ? 'collaborator' : 'collaborators'}
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {docPermissions.length === 0 ? (
+                    <div className="text-xs text-gray-500 text-center py-4 bg-[#141414] rounded-lg border border-[#222]">
+                      No explicit collaborator permissions set yet.
+                    </div>
+                  ) : (
+                    docPermissions.map((p: any) => {
+                      const u = p.user || {}
+                      const uName = u.name || p.userName || (p.email ? p.email.split('@')[0] : 'Collaborator')
+                      const uEmail = u.email || p.email || ''
+                      const uId = u.id || p.userId
+                      const uRole = (p.role || 'EDITOR') as Role
+                      const isOwner = uRole === 'OWNER'
+                      const isMe = user?.email && uEmail && user.email.toLowerCase() === uEmail.toLowerCase()
+
+                      return (
+                        <div key={p.id || uId || uEmail} className="flex items-center justify-between p-2.5 rounded-xl bg-[#1a1a1a] border border-[#262626]">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 border border-blue-500/20">
+                              {(uName.charAt(0) || 'U').toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                                <span>{uName}</span>
+                                {isMe && <span className="text-[10px] text-blue-400 bg-blue-950/60 border border-blue-800/40 px-1.5 py-0.2 rounded">You</span>}
+                                {p.expiresAt && <span className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.2 rounded">Guest</span>}
+                              </div>
+                              <div className="text-[11px] text-gray-500 truncate">{uEmail}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            {isOwner ? (
+                              <span className="text-xs font-semibold text-blue-400 bg-blue-950/40 px-2 py-1 rounded-md border border-blue-900/40">
+                                Owner
+                              </span>
+                            ) : (
+                              <>
+                                <select
+                                  value={uRole}
+                                  onChange={e => handleChangePermissionRole(uEmail, e.target.value as Role)}
+                                  className="h-7 px-2 bg-[#121212] border border-[#2e2e2e] rounded-md text-xs text-gray-200 outline-none focus:border-blue-500 cursor-pointer"
+                                  title="Role"
+                                >
+                                  <option value="EDITOR">Editor</option>
+                                  <option value="COMMENTER">Commenter</option>
+                                  <option value="VIEWER">Viewer</option>
+                                  <option value="RESTRICTED">Restricted</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePermission(uId)}
+                                  className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-950/30 rounded-md transition-colors cursor-pointer"
+                                  title={`Remove ${uName}`}
+                                >
+                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
               </div>
               <button
                 type="submit"
@@ -967,13 +1385,20 @@ export default function WorkspaceScreen({ workspaceId, documentId: initialDocId,
                   </button>
                 </div>
               ) : (
+              {/* Close Button */}
+              <div className="mt-5 pt-3 border-t border-[#262626]">
                 <button
                   onClick={handleGenerateShareLink}
                   className="w-full h-9 rounded-lg border border-[#333] hover:border-[#444] text-xs text-[#ccc] hover:text-white"
+                  type="button"
+                  onClick={() => setShowShareModal(false)}
+                  className="w-full h-9 rounded-lg border border-[#2e2e2e] text-gray-400 hover:text-white hover:bg-[#202020] text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Generate Shareable Link
+                  Done
                 </button>
               )}
+              </div>
             </div>
 
             <button

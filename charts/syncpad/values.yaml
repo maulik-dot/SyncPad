@@ -162,6 +162,7 @@ env:
   SYNCPAD_RATELIMIT_LOGIN_LIMIT: "500"
   SYNCPAD_RATELIMIT_REGISTER_LIMIT: "500"
   SYNCPAD_RATELIMIT_WS_LIMIT: "10000"
+  GEMINI_MODEL: "gemini-flash-lite-latest"
   JAVA_TOOL_OPTIONS: "-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 # Fallback Secret (used only when Vault Agent Injection is disabled)

@@ -43,7 +43,7 @@ public class SecurityConfig {
         this.passwordEncoder = passwordEncoder;
     }
 
-    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8443,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8082,http://127.0.0.1:8443}")
+    @Value("${app.cors.allowed-origins:https://localhost,https://127.0.0.1,https://localhost:8443,http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8083,http://localhost:8443,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8082,http://127.0.0.1:8083,http://127.0.0.1:8443}")
     private String allowedOrigins;
 
     @Bean
@@ -58,6 +58,9 @@ public class SecurityConfig {
                     "/ws/**",
                     "/",
                     "/index.html",
+                    "/views/**",
+                    "/partials/**",
+                    "/**/*.html",
                     "/manifest.json",
                     "/icons/**",
                     "/*.js",
@@ -69,6 +72,7 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
+                    "/share/**",
                     "/documents/share/**",
                     "/actuator/health/**",
                     "/actuator/info",

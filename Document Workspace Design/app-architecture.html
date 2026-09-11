@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncPad Application Architecture</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="app.css">
+    <style>
+        body { background: var(--bg-app); }
+        .arch-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .arch-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            backdrop-filter: var(--glass-blur);
+            background: var(--bg-surface-translucent);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .arch-header-inner,
+        .arch-main {
+            width: min(1180px, calc(100vw - 32px));
+            margin: 0 auto;
+        }
+        .arch-header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 0;
+        }
+        .arch-main {
+            padding: 2rem 0 3rem;
+            display: grid;
+            gap: 1.25rem;
+        }
+        .hero {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.08));
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+        }
+        .hero-grid,
+        .section-grid,
+        .stats-grid,
+        .flow-grid {
+            display: grid;
+            gap: 1rem;
+        }
+        .hero-grid { grid-template-columns: 1.3fr 0.9fr; }
+        .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .section-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .flow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .arch-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            padding: 1.15rem;
+        }
+        .arch-card h2,
+        .arch-card h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0.85rem;
+        }
+        .arch-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.55rem;
+            border-radius: var(--radius-full);
+            background: var(--accent-light);
+            color: var(--accent-primary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            margin-bottom: 0.85rem;
+        }
+        .stack-list,
+        .entity-list,
+        .bullet-list,
+        .endpoint-list,
+        .step-list {
+            display: grid;
+            gap: 0.65rem;
+        }
+        .stack-item,
+        .entity-item,
+        .endpoint-item,
+        .flow-step {
+            padding: 0.8rem 0.9rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-subtle);
+        }
+        .stack-item strong,
+        .entity-item strong,
+        .endpoint-item strong,
+        .flow-step strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 0.2rem;
+        }
+        .mono-block {
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            background: #0f172a;
+            color: #dbeafe;
+            font: 500 0.8rem/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .stat-box {
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+        .stat-box .value {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .muted { color: var(--text-muted); }
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .role-pill {
+            padding: 0.35rem 0.6rem;
+            border-radius: var(--radius-full);
+            background: var(--bg-hover);
+            border: 1px solid var(--border-color);
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+        .footer-note {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding-top: 0.35rem;
+        }
+        @media (max-width: 960px) {
+            .hero-grid,
+            .section-grid,
+            .flow-grid,
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .arch-header-inner {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="arch-shell">
+        <header class="arch-header">
+            <div class="arch-header-inner">
+                <div>
+                    <div class="logo-brand" style="font-size: 1.1rem; margin-bottom: 0.35rem;">
+                        <div class="logo-icon" style="width: 32px; height: 32px; font-size: 1rem;">S</div>
+                        <span>SyncPad Architecture</span>
+                    </div>
+                    <p class="muted">A product and engineering guide to how the application works end-to-end.</p>
+                </div>
+                <div class="pill-row">
+                    <span class="role-pill">Spring Boot 4</span>
+                    <span class="role-pill">PostgreSQL</span>
+                    <span class="role-pill">JWT Security</span>
+                    <span class="role-pill">STOMP WebSockets</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="arch-main">
+            <section class="hero">
+                <div class="hero-grid">
+                    <div>
+                        <div class="arch-kicker"><i data-lucide="layers-3" style="width:14px;height:14px;"></i>System Overview</div>
+                        <h1 style="margin-bottom: 0.65rem;">SyncPad is a collaborative workspace app with a Spring backend and a rich browser client.</h1>
+                        <p style="margin-bottom: 1rem; max-width: 62ch;">Users authenticate with JWT, browse workspaces and folders, edit documents and whiteboards, attach PDFs, collaborate in realtime over WebSockets, and persist data in PostgreSQL through JPA repositories and service-layer permission checks.</p>
+                        <div class="mono-block">Browser UI
+  -> REST API (/auth, /documents, /workspaces, /folders, /notifications)
+  -> Spring Controllers
+  -> Service Layer
+  -> JPA Repositories
+  -> PostgreSQL
+
+Browser UI
+  -> STOMP over /ws
+  -> /app/documents/* + /topic/*
+  -> Realtime document, notification, and PDF annotation updates</div>
+                    </div>
+                    <div class="arch-card">
+                        <h2><i data-lucide="route" style="width:18px;height:18px;color:var(--accent-primary);"></i>Main Runtime Flow</h2>
+                        <div class="step-list">
+                            <div class="flow-step"><strong>1. Authenticate</strong>Login, register, or Google sign-in returns a JWT.</div>
+                            <div class="flow-step"><strong>2. Load Workspace Data</strong>The UI fetches workspaces, folders, documents, comments, versions, and notifications.</div>
+                            <div class="flow-step"><strong>3. Edit and Collaborate</strong>REST saves durable data; WebSockets broadcast live presence and document updates.</div>
+                            <div class="flow-step"><strong>4. Persist and Restore</strong>Document versions, permissions, notifications, and attachments are reloaded on future sessions.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="stats-grid">
+                <div class="stat-box"><div class="value">5</div><div>REST domains</div><div class="muted">Auth, documents, workspaces, folders, notifications</div></div>
+                <div class="stat-box"><div class="value">2</div><div>Realtime channels</div><div class="muted">Document collaboration and notifications</div></div>
+                <div class="stat-box"><div class="value">10</div><div>Core PDF tools</div><div class="muted">Pointer, text select, pen, highlight, underline, rect, arrow, text box, note, eraser</div></div>
+                <div class="stat-box"><div class="value">13</div><div>Passing tests</div><div class="muted">Unit and integration coverage in the current repo state</div></div>
+            </section>
+
+            <section class="section-grid">
+                <article class="arch-card">
+                    <h2><i data-lucide="server" style="width:18px;height:18px;color:var(--accent-primary);"></i>Backend Structure</h2>
+                    <div class="stack-list">
+                        <div class="stack-item"><strong>`controller/`</strong>Exposes REST endpoints and STOMP message mappings.</div>
+                        <div class="stack-item"><strong>`service/`</strong>Contains business logic: permissions, sharing, versions, notifications, comments, folders, workspaces.</div>
+                        <div class="stack-item"><strong>`repository/`</strong>Spring Data JPA repositories used by services to query and persist entities.</div>
+                        <div class="stack-item"><strong>`entity/`</strong>JPA domain model for users, workspaces, folders, documents, permissions, comments, versions, notifications, and share links.</div>
+                        <div class="stack-item"><strong>`security/`</strong>JWT parsing, auth filter, user details service, and route security configuration.</div>
+                        <div class="stack-item"><strong>`config/`</strong>OpenAPI docs, WebSocket broker configuration, and demo seed data.</div>
+                    </div>
+                </article>
+
+                <article class="arch-card">
+                    <h2><i data-lucide="monitor" style="width:18px;height:18px;color:var(--accent-primary);"></i>Frontend Structure</h2>
+                    <div class="stack-list">
+                        <div class="stack-item"><strong>`index.html`</strong>The main app shell. It contains the auth UI, workspace UI, editor, whiteboard, notifications, PDF pane, and large embedded application script.</div>
+                        <div class="stack-item"><strong>`app.css`</strong>Shared design system: light/dark theme tokens, layout primitives, cards, buttons, editor visuals, and PDF styles.</div>
+                        <div class="stack-item"><strong>`js/doc/latex-compiler.js`</strong>LaTeX/Katex rendering for rich document content.</div>
+                        <div class="stack-item"><strong>`js/pdf/*`</strong>Modular PDF engine for rendering, annotation, capture, persistence, selection, history, and collaboration.</div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="section-grid">
+                <article class="arch-card">
+                    <h2><i data-lucide="database" style="width:18px;height:18px;color:var(--accent-primary);"></i>Core Data Model</h2>
+                    <div class="entity-list">
+                        <div class="entity-item"><strong>User</strong>Identity, email/password or Google provider metadata.</div>
+                        <div class="entity-item"><strong>Workspace + WorkspacePermission</strong>Top-level collaboration space plus per-user role mapping.</div>
+                        <div class="entity-item"><strong>Folder</strong>Organizes files inside a workspace-style grouping.</div>
+                        <div class="entity-item"><strong>Document + DocumentPermission</strong>Editable content item with per-user access role.</div>
+                        <div class="entity-item"><strong>DocumentVersion</strong>Snapshot history for restore and audit-like views.</div>
+                        <div class="entity-item"><strong>DocumentComment</strong>Threaded comments with replies and resolved state.</div>
+                        <div class="entity-item"><strong>ShareLink</strong>Tokenized document access with role and expiry.</div>
+                        <div class="entity-item"><strong>Notification</strong>Workspace invites, accept/decline flow, and role update events.</div>
+                    </div>
+                </article>
+
+                <article class="arch-card">
+                    <h2><i data-lucide="shield-check" style="width:18px;height:18px;color:var(--accent-primary);"></i>Security Model</h2>
+                    <div class="bullet-list">
+                        <div class="stack-item"><strong>Stateless JWT</strong>Users receive a signed token after auth. The browser stores it and includes it on protected requests.</div>
+                        <div class="stack-item"><strong>Spring Security Filter</strong>`JwtAuthenticationFilter` validates bearer tokens and sets the authenticated principal.</div>
+                        <div class="stack-item"><strong>Permission Enforcement</strong>Services check `DocumentPermission` and `WorkspacePermission` before allowing reads, edits, sharing, restore actions, and membership updates.</div>
+                        <div class="stack-item"><strong>WebSocket Auth</strong>The STOMP `CONNECT` frame can carry the JWT, which is validated in `WebSocketConfig`.</div>
+                    </div>
+                    <div class="pill-row" style="margin-top: 0.85rem;">
+                        <span class="role-pill">OWNER</span>
+                        <span class="role-pill">ADMIN</span>
+                        <span class="role-pill">EDITOR</span>
+                        <span class="role-pill">VIEWER</span>
+                    </div>
+                </article>
+            </section>
+
+            <section class="arch-card">
+                <h2><i data-lucide="workflow" style="width:18px;height:18px;color:var(--accent-primary);"></i>How a Typical Session Works</h2>
+                <div class="flow-grid">
+                    <div class="flow-step"><strong>Authentication</strong>The user signs in on the static client. `/auth/login`, `/auth/register`, or `/auth/google` returns a token and user identity.</div>
+                    <div class="flow-step"><strong>Workspace Boot</strong>The client fetches `/workspaces`, then workspace-scoped folders and accessible documents. Local UI state is restored from `localStorage` where relevant.</div>
+                    <div class="flow-step"><strong>Document Open</strong>Opening a document loads detail, comments, stats, versions, and any attached PDF metadata. The editor view becomes the active surface.</div>
+                    <div class="flow-step"><strong>Live Collaboration</strong>The client connects to `/ws`, subscribes to `/topic/documents/{id}`, and broadcasts edit/cursor messages to `/app/documents/{id}/edit`.</div>
+                    <div class="flow-step"><strong>Persistence</strong>Explicit document saves go through the service layer, update the `Document`, and create a new `DocumentVersion` snapshot.</div>
+                    <div class="flow-step"><strong>Notifications</strong>Workspace invites and membership changes persist in `Notification` records and are pushed live over `/topic/notifications/{email}`.</div>
+                </div>
+            </section>
+
+            <section class="section-grid">
+                <article class="arch-card">
+                    <h2><i data-lucide="file-text" style="width:18px;height:18px;color:var(--accent-primary);"></i>Document Engine</h2>
+                    <div class="bullet-list">
+                        <div class="stack-item"><strong>CRUD + Rename</strong>Documents can be created, updated, renamed, deleted, and filtered by folder or type.</div>
+                        <div class="stack-item"><strong>Permissions</strong>Owners can share; viewers cannot edit; collaborators receive role-based access.</div>
+                        <div class="stack-item"><strong>Versions</strong>Every create/update/restore action can create a `DocumentVersion` snapshot for history.</div>
+                        <div class="stack-item"><strong>Comments</strong>Users can create comment threads, reply, resolve, and delete based on ownership/role.</div>
+                        <div class="stack-item"><strong>Share Links</strong>Share tokens can grant role-based document access with expiry and revocation.</div>
+                    </div>
+                </article>
+
+                <article class="arch-card">
+                    <h2><i data-lucide="file-image" style="width:18px;height:18px;color:var(--accent-primary);"></i>PDF Engine</h2>
+                    <div class="bullet-list">
+                        <div class="stack-item"><strong>Renderer</strong>Uses PDF.js for real PDF files and a vector fallback library for built-in reference documents.</div>
+                        <div class="stack-item"><strong>Annotation Tools</strong>Pointer, text select, pen, highlighter, underline, rectangle, arrow, text box, sticky note, eraser.</div>
+                        <div class="stack-item"><strong>Capture</strong>Users can select a region, extract text, generate a snapshot, or insert captured content into the main document.</div>
+                        <div class="stack-item"><strong>Persistence</strong>Uploaded PDFs are stored client-side in IndexedDB; annotations are stored in `localStorage` and separated by user, doc, and PDF key.</div>
+                        <div class="stack-item"><strong>Realtime Sync</strong>PDF annotations are synced over STOMP to `/topic/documents/{id}/pdf-annotations`.</div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="section-grid">
+                <article class="arch-card">
+                    <h2><i data-lucide="plug-zap" style="width:18px;height:18px;color:var(--accent-primary);"></i>Primary API Surface</h2>
+                    <div class="endpoint-list">
+                        <div class="endpoint-item"><strong>`/auth/*`</strong>Register, login, Google login, and auth config.</div>
+                        <div class="endpoint-item"><strong>`/documents/*`</strong>CRUD, details, stats, versions, restore, comments, sharing, share links, PDF metadata.</div>
+                        <div class="endpoint-item"><strong>`/workspaces/*`</strong>Workspace CRUD, invites, sharing, member list, member role updates, recent files.</div>
+                        <div class="endpoint-item"><strong>`/folders/*`</strong>Folder CRUD and subfolder access.</div>
+                        <div class="endpoint-item"><strong>`/notifications/*`</strong>Inbox, unread count, accept/decline invite, mark read, delete, clear all.</div>
+                    </div>
+                </article>
+
+                <article class="arch-card">
+                    <h2><i data-lucide="radio-tower" style="width:18px;height:18px;color:var(--accent-primary);"></i>Realtime Channels</h2>
+                    <div class="endpoint-list">
+                        <div class="endpoint-item"><strong>`/ws`</strong>STOMP/SockJS endpoint used by the browser.</div>
+                        <div class="endpoint-item"><strong>`/app/documents/{id}/edit`</strong>Broadcasts document edits, cursor positions, and presence messages.</div>
+                        <div class="endpoint-item"><strong>`/app/documents/{id}/save`</strong>Triggers durable document update through the backend.</div>
+                        <div class="endpoint-item"><strong>`/topic/documents/{id}`</strong>Subscribers receive document collaboration events.</div>
+                        <div class="endpoint-item"><strong>`/app/documents/{id}/pdf-annotation`</strong>Pushes PDF annotation mutations.</div>
+                        <div class="endpoint-item"><strong>`/topic/notifications/{email}`</strong>Pushes invite and role-change notifications to a user.</div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="arch-card">
+                <h2><i data-lucide="boxes" style="width:18px;height:18px;color:var(--accent-primary);"></i>Deployment and Runtime Environment</h2>
+                <div class="section-grid">
+                    <div>
+                        <div class="stack-list">
+                            <div class="stack-item"><strong>Maven Build</strong>The project uses `pom.xml` with Spring Boot, JPA, Security, WebSocket, Validation, PostgreSQL, and OpenAPI dependencies.</div>
+                            <div class="stack-item"><strong>Docker</strong>The `Dockerfile` builds the jar in a Maven image and runs it in a Temurin JRE image.</div>
+                            <div class="stack-item"><strong>Compose</strong>`docker-compose.yml` starts PostgreSQL and the app on port `8082`.</div>
+                            <div class="stack-item"><strong>Swagger</strong>Interactive API docs are exposed through Springdoc at `/swagger-ui/index.html`.</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mono-block">Static Assets
+  src/main/resources/static/
+
+Java App
+  src/main/java/com/example/syncpad/
+
+Database
+  PostgreSQL
+
+Container Port
+  8082
+
+Tests
+  ./mvnw test</div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="footer-note">This page is a static architecture guide styled to match SyncPad's UI. Open it at <code>/app-architecture.html</code> when the app is running.</div>
+        </main>
+    </div>
+
+    <script>
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    </script>
+</body>
+</html>

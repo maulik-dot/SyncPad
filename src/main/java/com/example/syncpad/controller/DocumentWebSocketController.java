@@ -59,8 +59,8 @@ public class DocumentWebSocketController {
         engine.applyOperation(operation);
 
         // Broadcast character-level delta to all connected collaborators
+        // NOTE: dot-style topics only — RabbitMQ STOMP relay rejects '/' in topic names.
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".crdt", operation);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/crdt", operation);
     }
 
     @MessageMapping("/documents/{documentId}/edit")
@@ -80,7 +80,6 @@ public class DocumentWebSocketController {
         message.setDocumentId(documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/save")
@@ -101,7 +100,6 @@ public class DocumentWebSocketController {
         message.setType("SAVED");
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId, message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId, message);
     }
 
     @MessageMapping("/documents/{documentId}/presence")
@@ -114,14 +112,21 @@ public class DocumentWebSocketController {
             throw new AccessDeniedException("Unauthorized WebSocket presence operation");
         }
         String senderEmail = principal.getName();
-        documentService.assertCanEditDocument(documentId, senderEmail);
+        // Presence is view-level: any collaborator who can open the doc should be visible.
+        documentService.getDocument(documentId, senderEmail);
 
         message.put("userEmail", senderEmail);
         message.put("documentId", documentId);
         message.put("timestamp", System.currentTimeMillis());
 
+        if (!message.containsKey("role") || message.get("role") == null) {
+            com.example.syncpad.entity.Role role = documentService.getUserEffectiveRole(documentId, senderEmail);
+            if (role != null) {
+                message.put("role", role.name());
+            }
+        }
+
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".presence", (Object) message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/presence", (Object) message);
     }
 
     @MessageMapping("/documents/{documentId}/pdf-annotation")
@@ -140,6 +145,39 @@ public class DocumentWebSocketController {
         message.put("documentId", documentId);
 
         messagingTemplate.convertAndSend("/topic/documents." + documentId + ".pdf-annotations", (Object) message);
-        messagingTemplate.convertAndSend("/topic/documents/" + documentId + "/pdf-annotations", (Object) message);
+    }
+
+    @MessageMapping("/documents/{documentId}/mention")
+    public void handleDocumentMention(
+            @DestinationVariable Long documentId,
+            @Payload Map<String, Object> message,
+            Principal principal
+    ) {
+        if (principal == null || principal.getName() == null) {
+            throw new AccessDeniedException("Unauthorized WebSocket mention operation");
+        }
+        String senderEmail = principal.getName();
+        documentService.assertCanEditDocument(documentId, senderEmail);
+
+        message.put("senderEmail", senderEmail);
+        message.put("documentId", documentId);
+        message.put("type", "MENTION");
+        if (!message.containsKey("timestamp") || message.get("timestamp") == null) {
+            message.put("timestamp", System.currentTimeMillis());
+        }
+
+        messagingTemplate.convertAndSend("/topic/documents." + documentId, (Object) message);
+
+        String targetEmail = (String) message.get("mentionedEmail");
+        Long targetUserId = null;
+        if (message.get("mentionedUserId") != null) {
+            try {
+                targetUserId = Long.valueOf(message.get("mentionedUserId").toString());
+            } catch (Exception ignored) {}
+        }
+        String targetName = (String) message.get("mentionedName");
+        if (targetEmail != null && !targetEmail.isBlank()) {
+            documentService.notifyCollaboratorMention(documentId, senderEmail, targetEmail, targetUserId, targetName);
+        }
     }
 }

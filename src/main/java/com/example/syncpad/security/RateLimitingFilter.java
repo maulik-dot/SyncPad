@@ -30,6 +30,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     @Value("${syncpad.ratelimit.ws-limit:120}")
     private int wsLimit = 120;
 
+    @Value("${syncpad.ratelimit.ai-limit:60}")
+    private int aiLimit = 60;
+
     private static final long WINDOW_MS = 60_000L;
 
     public RateLimitingFilter(RateLimiterStore rateLimiterStore) {
@@ -69,6 +72,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (path.startsWith("/auth/register")) return registerLimit;
         if (path.startsWith("/documents/share/")) return shareLimit;
         if (path.startsWith("/ws")) return wsLimit;
+        if (path.startsWith("/api/ai/")) return aiLimit;
         return -1;
     }
 
@@ -77,6 +81,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (path.startsWith("/auth/register")) return "register";
         if (path.startsWith("/documents/share/")) return "share";
         if (path.startsWith("/ws")) return "ws";
+        if (path.startsWith("/api/ai/")) return "ai";
         return "general";
     }
 

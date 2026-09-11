@@ -236,4 +236,72 @@ public class WebSocketSecurityIntegrationTest {
             interceptor.preSend(message, (MessageChannel) null);
         });
     }
+
+    @Test
+    void testSendCrdtByEditorSucceedsAtInterceptorLevel() {
+        documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.EDITOR, alice.getEmail());
+
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(bob.getEmail(), null));
+        accessor.setDestination("/app/documents/" + doc.getId() + "/crdt");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertDoesNotThrow(() -> {
+            interceptor.preSend(message, (MessageChannel) null);
+        });
+    }
+
+    @Test
+    void testSendPresenceByEditorSucceedsAtInterceptorLevel() {
+        documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.EDITOR, alice.getEmail());
+
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(bob.getEmail(), null));
+        accessor.setDestination("/app/documents/" + doc.getId() + "/presence");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertDoesNotThrow(() -> {
+            interceptor.preSend(message, (MessageChannel) null);
+        });
+    }
+
+    @Test
+    void testSendPresenceByViewerSucceedsAtInterceptorLevel() {
+        documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.VIEWER, alice.getEmail());
+
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(bob.getEmail(), null));
+        accessor.setDestination("/app/documents/" + doc.getId() + "/presence");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertDoesNotThrow(() -> {
+            interceptor.preSend(message, (MessageChannel) null);
+        });
+    }
+
+    @Test
+    void testHandleCrdtOperation_InsertsAndSucceeds() {
+        documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.EDITOR, alice.getEmail());
+
+        Principal bobPrincipal = () -> bob.getEmail();
+        com.example.syncpad.crdt.CrdtId charId = new com.example.syncpad.crdt.CrdtId("bob", 10);
+        com.example.syncpad.crdt.CrdtOperation op = com.example.syncpad.crdt.CrdtOperation.insert(doc.getId(), charId, null, null, "X", bob.getEmail());
+
+        assertDoesNotThrow(() -> {
+            webSocketController.handleCrdtOperation(doc.getId(), op, bobPrincipal);
+        });
+    }
+
+    @Test
+    void testHandleDocumentEdit_BroadcastsRichStylesAndFormulas() {
+        documentService.updateDocumentPermission(doc.getId(), bob.getId(), bob.getEmail(), Role.EDITOR, alice.getEmail());
+
+        Principal bobPrincipal = () -> bob.getEmail();
+        String richContent = "<h1>Title</h1><p><b>Bold</b> and <span style=\"color:#ef4444\">Red</span> and <span class=\"doc-latex-inline\" data-latex=\"E=mc^2\">E=mc^2</span></p>";
+        DocumentEditMessage editMsg = new DocumentEditMessage(doc.getId(), "Styled Title", richContent, bob.getEmail(), "Bob", "EDIT");
+
+        assertDoesNotThrow(() -> {
+            webSocketController.handleDocumentEdit(doc.getId(), editMsg, bobPrincipal, null);
+        });
+    }
 }

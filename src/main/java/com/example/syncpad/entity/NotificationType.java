@@ -5,5 +5,6 @@ public enum NotificationType {
     INVITE_ACCEPTED,
     INVITE_DECLINED,
     ROLE_UPDATED,
+    DOCUMENT_MENTION,
     SYSTEM
 }

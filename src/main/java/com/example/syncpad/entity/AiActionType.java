@@ -7,5 +7,10 @@ public enum AiActionType {
     FIX_GRAMMAR,
     OUTLINE,
     TRANSLATE,
-    CUSTOM
+    CUSTOM,
+    CODE_EXPLAIN,
+    CODE_FIX,
+    CODE_GENERATE,
+    LATEX_EXPLAIN,
+    LATEX_GENERATE
 }

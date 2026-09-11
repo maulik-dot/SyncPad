@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.example.syncpad.dto.request.GoogleLoginRequest;
 import com.example.syncpad.dto.request.LoginRequest;
 import com.example.syncpad.dto.request.RegisterRequest;
 import com.example.syncpad.dto.response.AuthResponse;
@@ -23,6 +24,7 @@ import com.example.syncpad.entity.RefreshToken;
 import com.example.syncpad.entity.User;
 import com.example.syncpad.exception.DuplicateEmailException;
 import com.example.syncpad.exception.InvalidTokenException;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.example.syncpad.repository.RefreshTokenRepository;
 import com.example.syncpad.repository.UserRepository;
 import com.example.syncpad.repository.WorkspacePermissionRepository;
@@ -158,5 +160,26 @@ public class AuthServiceTest {
 
         verify(refreshTokenRepository).save(rt);
         verify(tokenBlacklistService).blacklistToken(any(), any(Long.class));
+    }
+
+    @Test
+    public void testGoogleLogin_UnconfiguredClientId() {
+        ReflectionTestUtils.setField(authService, "googleClientId", "");
+        GoogleLoginRequest request = new GoogleLoginRequest("sample-token");
+        assertThrows(InvalidTokenException.class, () -> authService.googleLogin(request));
+    }
+
+    @Test
+    public void testGoogleLogin_MissingToken() {
+        ReflectionTestUtils.setField(authService, "googleClientId", "12345.apps.googleusercontent.com");
+        GoogleLoginRequest request = new GoogleLoginRequest("");
+        assertThrows(InvalidTokenException.class, () -> authService.googleLogin(request));
+    }
+
+    @Test
+    public void testGoogleLogin_InvalidToken() {
+        ReflectionTestUtils.setField(authService, "googleClientId", "12345.apps.googleusercontent.com");
+        GoogleLoginRequest request = new GoogleLoginRequest("invalid.jwt.token");
+        assertThrows(InvalidTokenException.class, () -> authService.googleLogin(request));
     }
 }

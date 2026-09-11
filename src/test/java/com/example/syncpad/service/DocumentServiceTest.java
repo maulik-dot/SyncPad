@@ -25,8 +25,6 @@ import com.example.syncpad.repository.DocumentVersionRepository;
 import com.example.syncpad.repository.TagRepository;
 import com.example.syncpad.repository.UserFavoriteRepository;
 import com.example.syncpad.repository.UserRepository;
-import com.example.syncpad.repository.WorkspacePermissionRepository;
-import com.example.syncpad.repository.WorkspaceRepository;
 
 @ExtendWith(MockitoExtension.class)
 public class DocumentServiceTest {
@@ -48,15 +46,6 @@ public class DocumentServiceTest {
 
     @Mock
     private UserFavoriteRepository userFavoriteRepository;
-
-    @Mock
-    private WorkspaceRepository workspaceRepository;
-
-    @Mock
-    private WorkspacePermissionRepository workspacePermissionRepository;
-
-    @Mock
-    private NotificationService notificationService;
 
     @InjectMocks
     private DocumentService documentService;

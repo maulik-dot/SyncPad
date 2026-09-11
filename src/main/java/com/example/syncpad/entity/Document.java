@@ -168,8 +168,8 @@ public class Document {
     }
 
     public void removeTag(Tag tag) {
-        if (this.tags != null) {
-            this.tags.remove(tag);
+        if (this.tags != null && tag != null) {
+            this.tags.removeIf(t -> t.getId() != null && t.getId().equals(tag.getId()));
         }
     }
 }

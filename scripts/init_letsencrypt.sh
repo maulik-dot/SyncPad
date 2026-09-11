@@ -41,10 +41,12 @@ if command -v certbot >/dev/null 2>&1; then
         --non-interactive
 
     echo "--> Copying issued certificates to nginx/ssl..."
+    cp "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" "${SSL_DIR}/server.crt"
+    cp "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" "${SSL_DIR}/server.key"
     cp "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" "${SSL_DIR}/cert.pem"
     cp "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" "${SSL_DIR}/key.pem"
-    chmod 600 "${SSL_DIR}/key.pem"
-    chmod 644 "${SSL_DIR}/cert.pem"
+    chmod 600 "${SSL_DIR}/server.key" "${SSL_DIR}/key.pem"
+    chmod 644 "${SSL_DIR}/server.crt" "${SSL_DIR}/cert.pem"
 
     echo "--> Reloading Nginx configuration..."
     if docker ps --filter "name=syncpad_nginx" --filter "status=running" | grep -q "syncpad_nginx"; then

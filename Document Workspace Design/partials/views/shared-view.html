@@ -1,0 +1,62 @@
+                <div id="sharedWithMeView" class="hidden" style="flex: 1; overflow-y: auto; padding: 2rem;">
+                    
+                    <!-- HEADER -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1.25rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+                                <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(139, 92, 246, 0.1); display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
+                                    <i data-lucide="users" style="width:20px;height:20px;"></i>
+                                </div>
+                                <h1 style="font-size: 1.6rem; font-weight: 700;">Shared with me</h1>
+                                <span id="sharedTotalBadge" class="notif-badge-pill role" style="font-size: 0.72rem;">0 items</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Workspaces, folders and documents where you have collaborator permissions.</p>
+                        </div>
+
+                        <div style="position: relative; width: 280px;">
+                            <i data-lucide="search" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            <input type="text" id="sharedSearchInput" oninput="renderSharedWithMeScreen()" class="input" placeholder="Search shared items..." style="padding-left: 2.2rem; font-size: 0.82rem; height: 36px;">
+                        </div>
+                    </div>
+
+                    <!-- SECTION 0: PENDING COLLABORATION REQUESTS & INVITATIONS -->
+                    <div id="sharedPendingInvitesSection" style="margin-bottom: 2.5rem; display: none;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                                <i data-lucide="mail-check" style="width:18px;height:18px;color:#f59e0b;"></i>
+                                <span>Pending Requests & Invitations</span>
+                                <span id="sharedPendingBadge" class="notif-badge-pill pending" style="font-size: 0.72rem; background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25);">0 pending</span>
+                            </h2>
+                        </div>
+                        <div id="sharedPendingGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+                            <!-- Pending request cards rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- SECTION 1: SHARED WORKSPACES -->
+                    <div style="margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                                <i data-lucide="layout-grid" style="width:18px;height:18px;color:var(--primary);"></i>
+                                <span>Shared Workspaces</span>
+                            </h2>
+                        </div>
+                        <div id="sharedWorkspacesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                            <!-- Shared workspace cards rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- SECTION 2: SHARED DOCUMENTS & WHITEBOARDS -->
+                    <div style="margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <h2 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                                <i data-lucide="file-text" style="width:18px;height:18px;color:#8b5cf6;"></i>
+                                <span>Shared Documents & Whiteboards</span>
+                            </h2>
+                        </div>
+                        <div id="sharedDocsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+                            <!-- Shared document cards rendered dynamically -->
+                        </div>
+                    </div>
+
+                </div>

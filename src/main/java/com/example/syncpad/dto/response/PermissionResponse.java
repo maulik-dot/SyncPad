@@ -1,6 +1,8 @@
 package com.example.syncpad.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.example.syncpad.entity.Role;
 
@@ -50,4 +52,12 @@ public class PermissionResponse {
 
     public boolean isExpired() { return isExpired; }
     public void setExpired(boolean expired) { isExpired = expired; }
+
+    public Map<String, Object> getUser() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", userId);
+        map.put("name", userName);
+        map.put("email", userEmail);
+        return map;
+    }
 }

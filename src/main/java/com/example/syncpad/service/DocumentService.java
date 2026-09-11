@@ -42,6 +42,7 @@ import com.example.syncpad.repository.WorkspacePermissionRepository;
 import com.example.syncpad.repository.WorkspaceRepository;
 
 @Service
+@Transactional(readOnly = true)
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
@@ -133,9 +134,8 @@ public class DocumentService {
         }
 
         if (wsName != null && !wsName.isBlank()) {
-            Optional<Workspace> wsOpt = workspaceRepository.findByName(wsName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
+            List<Workspace> wsList = workspaceRepository.findAllByName(wsName.trim());
+            for (Workspace ws : wsList) {
                 if (ws.getOwner() != null && ws.getOwner().getId().equals(user.getId())) {
                     return Role.OWNER;
                 }
@@ -162,9 +162,8 @@ public class DocumentService {
         }
 
         if (wsName != null && !wsName.isBlank()) {
-            Optional<Workspace> wsOpt = workspaceRepository.findByName(wsName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
+            List<Workspace> wsList = workspaceRepository.findAllByName(wsName.trim());
+            for (Workspace ws : wsList) {
                 if (ws.getOwner() != null && ws.getOwner().getId().equals(user.getId())) {
                     return true;
                 }
@@ -223,15 +222,18 @@ public class DocumentService {
             }
         }
 
-        if (workspaceName != null && !workspaceName.isBlank()) {
-            java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(workspaceName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
-                boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
-                boolean hasWsPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
-                        .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
-                        .orElse(false);
-                if (!isWsOwner && !hasWsPerm) {
+        if (workspaceName != null && !workspaceName.isBlank() && workspaceRepository != null) {
+            String trimmedWs = workspaceName.trim();
+            List<Workspace> wsList = workspaceRepository.findAllByName(trimmedWs);
+            if (!wsList.isEmpty()) {
+                boolean hasWsPerm = wsList.stream().anyMatch(ws -> {
+                    boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
+                    boolean hasPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
+                            .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
+                            .orElse(false);
+                    return isWsOwner || hasPerm;
+                });
+                if (!hasWsPerm) {
                     throw new PermissionDeniedException("Access restricted: You do not have permission to add documents to workspace '" + workspaceName + "'");
                 }
             }
@@ -412,6 +414,18 @@ public class DocumentService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<DocumentResponse> getSharedWithMeDocuments(String userEmail) {
+        User user = getUserByEmail(userEmail);
+        List<DocumentPermission> perms = permissionRepository.findByUser(user);
+        return perms.stream()
+                .filter(p -> !p.isExpired() && p.getRole() != Role.RESTRICTED)
+                .map(DocumentPermission::getDocument)
+                .filter(doc -> doc != null && !doc.isTrashed())
+                .map(doc -> toResponse(doc, userEmail))
+                .collect(Collectors.toList());
+    }
+
     public List<Document> getAccessibleDocuments(String userEmail) {
         return getAccessibleDocuments(userEmail, null, null);
     }
@@ -421,6 +435,10 @@ public class DocumentService {
     }
 
     public List<Document> getAccessibleDocuments(String userEmail, String typeStr, String workspaceFilter) {
+        return getAccessibleDocuments(userEmail, typeStr, workspaceFilter, false);
+    }
+
+    public List<Document> getAccessibleDocuments(String userEmail, String typeStr, String workspaceFilter, boolean rootOnly) {
         User user = getUserByEmail(userEmail);
         List<Document> allDocs = documentRepository.findAll();
 
@@ -433,11 +451,15 @@ public class DocumentService {
                         docWs = doc.getFolder().getWorkspaceName();
                     }
                     if (docWs == null) {
+                        if (workspaceRepository == null) return false;
                         List<Workspace> owned = workspaceRepository.findByOwnerId(user.getId());
-                        return !owned.isEmpty() && owned.get(0).getName().equalsIgnoreCase(workspaceFilter.trim());
+                        return owned != null && !owned.isEmpty() && owned.get(0).getName().trim().equalsIgnoreCase(workspaceFilter.trim());
                     }
-                    return docWs.equalsIgnoreCase(workspaceFilter.trim());
+                    return docWs.trim().equalsIgnoreCase(workspaceFilter.trim());
                 })
+                // Folder-owned docs (folder_id != null) belong to the folder, not the workspace root.
+                // When rootOnly=true (workspace dashboard), hide them so they only appear inside their folder.
+                .filter(doc -> !rootOnly || doc.getFolder() == null)
                 .filter(doc -> getEffectiveRole(doc, user) != null)
                 .filter(doc -> {
                     if (typeStr == null || typeStr.isBlank()) return true;
@@ -750,6 +772,7 @@ public class DocumentService {
         Optional<DocumentPermission> existing = permissionRepository.findByUserAndDocument(finalTargetUser, document);
         if (role == null) {
             existing.ifPresent(permissionRepository::delete);
+            broadcastPermissionChange(documentId, finalTargetUser.getId(), finalTargetUser.getEmail(), null, requesterEmail);
             return new PermissionResponse(null, finalTargetUser.getId(), finalTargetUser.getName(), finalTargetUser.getEmail(), null);
         }
 
@@ -761,6 +784,7 @@ public class DocumentService {
         perm.setRole(role);
         perm.setExpiresAt(expiresAt);
         DocumentPermission saved = permissionRepository.save(perm);
+        broadcastPermissionChange(documentId, finalTargetUser.getId(), finalTargetUser.getEmail(), saved.getRole(), requesterEmail);
         return new PermissionResponse(saved.getId(), finalTargetUser.getId(), finalTargetUser.getName(), finalTargetUser.getEmail(), saved.getRole(), saved.getExpiresAt());
     }
 
@@ -778,6 +802,23 @@ public class DocumentService {
 
         permissionRepository.findByUserAndDocument(targetUser, document)
                 .ifPresent(permissionRepository::delete);
+        broadcastPermissionChange(documentId, targetUser.getId(), targetUser.getEmail(), null, requesterEmail);
+    }
+
+    private void broadcastPermissionChange(Long documentId, Long targetUserId, String targetEmail, Role newRole, String updatedBy) {
+        if (messagingTemplate != null) {
+            try {
+                java.util.Map<String, Object> permEvent = new java.util.HashMap<>();
+                permEvent.put("type", "PERMISSION_CHANGE");
+                permEvent.put("documentId", documentId);
+                permEvent.put("targetUserId", targetUserId);
+                permEvent.put("targetEmail", targetEmail);
+                permEvent.put("newRole", newRole != null ? newRole.name() : null);
+                permEvent.put("updatedBy", updatedBy);
+                permEvent.put("timestamp", System.currentTimeMillis());
+                messagingTemplate.convertAndSend("/topic/documents." + documentId, (Object) permEvent);
+            } catch (Exception ignored) {}
+        }
     }
 
     @Transactional
@@ -910,8 +951,8 @@ public class DocumentService {
             throw new PermissionDeniedException("Only the OWNER or ADMIN can generate share links");
         }
 
-        if (request.getRole() != Role.VIEWER && request.getRole() != Role.EDITOR) {
-            throw new IllegalArgumentException("Share links can only grant VIEWER or EDITOR permissions");
+        if (request.getRole() != Role.VIEWER && request.getRole() != Role.COMMENTER && request.getRole() != Role.EDITOR) {
+            throw new IllegalArgumentException("Share links can only grant VIEWER, COMMENTER, or EDITOR permissions");
         }
 
         shareLinkRepository.findByDocumentAndActiveTrue(document)
@@ -929,6 +970,56 @@ public class DocumentService {
         return new com.example.syncpad.dto.response.ShareLinkResponse(
                 saved.getId(), document.getId(), saved.getToken(), url, saved.getRole(), saved.getExpiresAt(), saved.isActive()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<com.example.syncpad.dto.response.ShareLinkResponse> getActiveShareLink(Long documentId, String currentUserEmail) {
+        User user = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new PermissionDeniedException("User not found"));
+        Document document = findDocumentById(documentId);
+
+        if (!isUserDocumentAdmin(document, user)) {
+            throw new PermissionDeniedException("Only the OWNER or ADMIN can view share link details");
+        }
+
+        return shareLinkRepository.findByDocumentAndActiveTrue(document)
+                .filter(l -> l.getExpiresAt() == null || java.time.LocalDateTime.now().isBefore(l.getExpiresAt()))
+                .map(l -> new com.example.syncpad.dto.response.ShareLinkResponse(
+                        l.getId(), document.getId(), l.getToken(), "/share/" + l.getToken(), l.getRole(), l.getExpiresAt(), l.isActive()
+                ));
+    }
+
+    @Transactional
+    public com.example.syncpad.dto.response.SharedDocumentResponse updateDocumentByShareToken(
+            String token,
+            com.example.syncpad.dto.request.UpdateDocumentRequest request
+    ) {
+        com.example.syncpad.entity.ShareLink shareLink = shareLinkRepository.findByToken(token)
+                .orElseThrow(() -> new DocumentNotFoundException("Share link not found or invalid"));
+
+        if (!shareLink.isActive()) {
+            throw new PermissionDeniedException("This share link has been revoked");
+        }
+
+        if (shareLink.getExpiresAt() != null && java.time.LocalDateTime.now().isAfter(shareLink.getExpiresAt())) {
+            throw new PermissionDeniedException("This share link has expired");
+        }
+
+        if (shareLink.getRole() != Role.EDITOR) {
+            throw new PermissionDeniedException("This share link does not allow edit permissions");
+        }
+
+        Document document = shareLink.getDocument();
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            document.setTitle(request.getTitle().trim());
+        }
+        if (request.getContent() != null) {
+            document.setContent(request.getContent());
+        }
+        document.setUpdatedAt(java.time.LocalDateTime.now());
+        Document saved = documentRepository.save(document);
+
+        return com.example.syncpad.dto.response.SharedDocumentResponse.fromEntity(saved, shareLink.getRole());
     }
 
     @Transactional
@@ -1186,18 +1277,30 @@ public class DocumentService {
         return userFavoriteRepository.existsByUserIdAndDocumentId(userId, documentId);
     }
 
+    public Role getUserEffectiveRole(Long documentId, String userEmail) {
+        try {
+            User user = getUserByEmail(userEmail);
+            Document doc = findDocumentById(documentId);
+            return getEffectiveRole(doc, user);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public DocumentResponse toResponse(Document doc, String userEmail) {
         if (doc == null) return null;
         boolean starred = false;
+        Role role = null;
         try {
             if (userEmail != null) {
                 User user = getUserByEmail(userEmail);
                 if (user != null) {
                     starred = isDocumentStarred(doc.getId(), user.getId());
+                    role = getEffectiveRole(doc, user);
                 }
             }
         } catch (Exception e) { /* user not found is fine */ }
-        return DocumentResponse.from(doc, starred);
+        return DocumentResponse.from(doc, starred, role);
     }
 
     public List<DocumentResponse> toResponses(List<Document> docs, String userEmail) {
@@ -1205,5 +1308,59 @@ public class DocumentService {
         return docs.stream()
                 .map(doc -> toResponse(doc, userEmail))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void notifyCollaboratorMention(Long documentId, String senderEmail, String targetEmail, Long targetUserId, String targetName) {
+        User sender = getUserByEmail(senderEmail);
+        Document doc = findDocumentById(documentId);
+
+        if (getEffectiveRole(doc, sender) == null) {
+            throw new PermissionDeniedException("Access denied to mention collaborators in this document");
+        }
+
+        User targetUser = null;
+        if (targetUserId != null) {
+            targetUser = userRepository.findById(targetUserId).orElse(null);
+        }
+        if (targetUser == null && targetEmail != null && !targetEmail.isBlank()) {
+            targetUser = userRepository.findByEmail(targetEmail.trim().toLowerCase()).orElse(null);
+        }
+
+        if (targetUser == null) {
+            if (targetEmail != null && !targetEmail.isBlank()) {
+                String email = targetEmail.trim().toLowerCase();
+                String displayName = (targetName != null && !targetName.isBlank()) ? targetName : email.split("@")[0];
+                User newUser = new User(displayName, email, "");
+                targetUser = userRepository.save(newUser);
+            }
+        }
+
+        if (targetUser == null || targetUser.getId().equals(sender.getId())) {
+            return;
+        }
+
+        if (notificationService != null) {
+            notificationService.createDocumentMentionNotification(targetUser, sender, doc);
+        }
+
+        if (auditLogService != null) {
+            auditLogService.log(sender, null, doc, "DOCUMENT_MENTION",
+                    "Mentioned " + targetUser.getName() + " (" + targetUser.getEmail() + ") in document '" + (doc.getTitle() != null ? doc.getTitle() : "Untitled") + "'");
+        }
+
+        if (webhookService != null && doc.getWorkspaceName() != null) {
+            final User finalTarget = targetUser;
+            workspaceRepository.findByName(doc.getWorkspaceName()).ifPresent(ws ->
+                webhookService.dispatch(ws.getId(), "DOCUMENT_MENTION", java.util.Map.of(
+                        "documentId", doc.getId(),
+                        "documentTitle", doc.getTitle() != null ? doc.getTitle() : "Untitled Document",
+                        "senderEmail", sender.getEmail(),
+                        "senderName", sender.getName() != null ? sender.getName() : sender.getEmail(),
+                        "mentionedEmail", finalTarget.getEmail(),
+                        "mentionedName", finalTarget.getName() != null ? finalTarget.getName() : finalTarget.getEmail()
+                ))
+            );
+        }
     }
 }

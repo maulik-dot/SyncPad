@@ -14,6 +14,8 @@ public class AiGenerateRequest {
 
     private String targetLanguage;
     private String tone;
+    private String language; // for CODE actions: e.g., javascript, python
+    private Integer selectionLength; // for length-aware token budgeting
 
     public AiGenerateRequest() {}
 
@@ -41,4 +43,10 @@ public class AiGenerateRequest {
 
     public String getTone() { return tone; }
     public void setTone(String tone) { this.tone = tone; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+
+    public Integer getSelectionLength() { return selectionLength; }
+    public void setSelectionLength(Integer selectionLength) { this.selectionLength = selectionLength; }
 }

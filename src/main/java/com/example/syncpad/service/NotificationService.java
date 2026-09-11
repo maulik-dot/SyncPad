@@ -143,7 +143,10 @@ public class NotificationService {
 
         // Push real-time notification over WebSockets
         try {
-            messagingTemplate.convertAndSend("/topic/notifications/" + targetUser.getEmail(), response);
+            messagingTemplate.convertAndSend("/topic/notifications." + targetUser.getEmail(), response);
+            if (targetUser.getId() != null) {
+                messagingTemplate.convertAndSend("/topic/users." + targetUser.getId() + ".notifications", response);
+            }
         } catch (Exception e) {
             // WebSocket push optional if client offline
         }
@@ -199,7 +202,10 @@ public class NotificationService {
             NotificationResponse acceptanceResponse = NotificationResponse.fromEntity(savedAcceptance);
 
             try {
-                messagingTemplate.convertAndSend("/topic/notifications/" + notification.getSender().getEmail(), acceptanceResponse);
+                messagingTemplate.convertAndSend("/topic/notifications." + notification.getSender().getEmail(), acceptanceResponse);
+                if (notification.getSender().getId() != null) {
+                    messagingTemplate.convertAndSend("/topic/users." + notification.getSender().getId() + ".notifications", acceptanceResponse);
+                }
             } catch (Exception e) {
                 // WebSocket push
             }
@@ -245,7 +251,10 @@ public class NotificationService {
             NotificationResponse declinationResponse = NotificationResponse.fromEntity(savedDeclination);
 
             try {
-                messagingTemplate.convertAndSend("/topic/notifications/" + notification.getSender().getEmail(), declinationResponse);
+                messagingTemplate.convertAndSend("/topic/notifications." + notification.getSender().getEmail(), declinationResponse);
+                if (notification.getSender().getId() != null) {
+                    messagingTemplate.convertAndSend("/topic/users." + notification.getSender().getId() + ".notifications", declinationResponse);
+                }
             } catch (Exception e) {
                 // WebSocket push
             }
@@ -274,13 +283,12 @@ public class NotificationService {
     public void pushNotification(User recipient, NotificationResponse response) {
         if (recipient == null || messagingTemplate == null || response == null) return;
         try {
-            // 1. Destination: /topic/notifications/{email}
-            messagingTemplate.convertAndSend("/topic/notifications/" + recipient.getEmail(), response);
+            // 1. Destination: /topic/notifications.{email} (dot-style: relay rejects '/')
+            messagingTemplate.convertAndSend("/topic/notifications." + recipient.getEmail(), response);
 
-            // 2. Destination: /topic/users.{userId}.notifications and /topic/users/{userId}/notifications
+            // 2. Destination: /topic/users.{userId}.notifications (dot-style only)
             if (recipient.getId() != null) {
                 messagingTemplate.convertAndSend("/topic/users." + recipient.getId() + ".notifications", response);
-                messagingTemplate.convertAndSend("/topic/users/" + recipient.getId() + "/notifications", response);
             }
 
             // 3. User queue destination
@@ -304,6 +312,37 @@ public class NotificationService {
                 null,
                 NotificationType.SYSTEM,
                 "New Comment",
+                message,
+                null,
+                NotificationStatus.RESOLVED
+        );
+        notification.setRead(false);
+        Notification saved = notificationRepository.save(notification);
+        NotificationResponse response = NotificationResponse.fromEntity(saved);
+
+        pushNotification(recipient, response);
+        return response;
+    }
+
+    @Transactional
+    public NotificationResponse createDocumentMentionNotification(User recipient, User mentioner, com.example.syncpad.entity.Document document) {
+        if (recipient == null || mentioner == null || document == null) return null;
+        if (recipient.getId() != null && recipient.getId().equals(mentioner.getId())) return null;
+
+        Workspace workspace = (document.getWorkspaceName() != null)
+                ? workspaceRepository.findByName(document.getWorkspaceName()).orElse(null)
+                : null;
+
+        String docTitle = (document.getTitle() != null && !document.getTitle().isBlank())
+                ? document.getTitle() : "Untitled Document";
+        String message = mentioner.getName() + " mentioned you in '" + docTitle + "'";
+
+        Notification notification = new Notification(
+                recipient,
+                mentioner,
+                workspace,
+                NotificationType.DOCUMENT_MENTION,
+                "Mentioned in Document",
                 message,
                 null,
                 NotificationStatus.RESOLVED

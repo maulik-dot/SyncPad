@@ -1,0 +1,105 @@
+                <div id="whiteboardView" class="hidden" style="flex: 1; display: flex; flex-direction: column; height: 100%;">
+                    
+                    <!-- WHITEBOARD TOP BAR -->
+                    <header style="height: 54px; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-translucent); backdrop-filter: var(--glass-blur); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; z-index: 20;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button class="btn btn-icon" onclick="closeWhiteboardView()" title="Back to Dashboard" aria-label="Back">
+                                <i data-lucide="arrow-left" style="width:18px;height:18px;"></i>
+                            </button>
+                            <div class="toolbar-divider"></div>
+                            <input type="text" id="whiteboardTitleInput" style="font-size: 1rem; font-weight: 600; border: none; background: transparent; outline: none; color: var(--text-primary); width: 280px;" value="SyncPad Architecture Diagram" oninput="onWhiteboardTitleChange(this.value)" onblur="onWhiteboardTitleBlur(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
+                            <span class="badge badge-board">Whiteboard Canvas</span>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="avatar-group">
+                                <div class="avatar" style="background:#10b981;" title="Carol (Designing)">C</div>
+                                <div class="avatar" style="background:#f59e0b;" title="Dave (Viewing)">D</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="openShareModal()" title="Share Whiteboard" aria-label="Share">
+                                <i data-lucide="share-2" style="width:16px;height:16px;"></i>
+                                <span>Share</span>
+                            </button>
+                            <button class="btn btn-icon" onclick="toggleCommentsSidebar()" title="Comments" aria-label="Comments">
+                                <i data-lucide="message-square" style="width:18px;height:18px;"></i>
+                            </button>
+                        </div>
+                    </header>
+
+                    <!-- CANVAS STAGE -->
+                    <div class="whiteboard-stage" id="boardStage">
+                        
+                        <!-- FLOATING LEFT TOOLBAR -->
+                        <div class="floating-tools-left">
+                            <button class="btn btn-icon btn-active" title="Select (V)" aria-label="Select"><i data-lucide="mouse-pointer" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Pan Hand (H)" aria-label="Pan"><i data-lucide="hand" style="width:18px;height:18px;"></i></button>
+                            <div class="toolbar-divider" style="width:18px;height:1px;margin:0.2rem 0;"></div>
+                            <button class="btn btn-icon" title="Pen" aria-label="Pen"><i data-lucide="pen-tool" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Sticky Note" aria-label="Sticky Note"><i data-lucide="sticky-note" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Shapes" aria-label="Shape"><i data-lucide="square" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Arrow & Line" aria-label="Arrow"><i data-lucide="arrow-right" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Text" aria-label="Text"><i data-lucide="type" style="width:18px;height:18px;"></i></button>
+                            <button class="btn btn-icon" title="Eraser" aria-label="Eraser"><i data-lucide="eraser" style="width:18px;height:18px;"></i></button>
+                        </div>
+
+                        <!-- CANVAS ARCHITECTURE DIAGRAM SVG -->
+                        <svg width="100%" height="100%" style="position: absolute; top:0; left:0;">
+                            <defs>
+                                <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+                                </marker>
+                            </defs>
+                            
+                            <!-- CONNECTORS -->
+                            <line x1="220" y1="280" x2="360" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)" />
+                            <line x1="480" y1="280" x2="620" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)" />
+                            <line x1="740" y1="280" x2="880" y2="280" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)" />
+
+                            <!-- SELECTED OBJECT CONTEXTUAL TOOLBAR HIGHLIGHT -->
+                            <rect x="610" y="230" width="140" height="100" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="4" rx="10"/>
+                            <!-- RESIZE HANDLES -->
+                            <circle cx="610" cy="230" r="4" fill="#2563eb"/>
+                            <circle cx="750" cy="230" r="4" fill="#2563eb"/>
+                            <circle cx="610" cy="330" r="4" fill="#2563eb"/>
+                            <circle cx="750" cy="330" r="4" fill="#2563eb"/>
+                        </svg>
+
+                        <!-- CANVAS DIAGRAM OBJECTS -->
+                        <div style="position: absolute; top: 245px; left: 100px;" class="card">
+                            <div style="font-weight: 600; font-size: 0.9rem;">User Browser</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">React SPA / WebSockets</div>
+                        </div>
+
+                        <div style="position: absolute; top: 245px; left: 360px;" class="card">
+                            <div style="font-weight: 600; font-size: 0.9rem;">API Gateway</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Spring Cloud / NGINX</div>
+                        </div>
+
+                        <div style="position: absolute; top: 245px; left: 620px; z-index: 10;" class="card">
+                            <div style="font-weight: 600; font-size: 0.9rem; color: #2563eb;">Spring Boot</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">STOMP + JWT Security</div>
+                        </div>
+
+                        <!-- STICKY NOTES -->
+                        <div style="position: absolute; top: 120px; left: 420px; width: 160px; height: 140px; background: #fef08a; padding: 0.9rem; border-radius: var(--radius-sm); box-shadow: var(--shadow-md); transform: rotate(-2deg);">
+                            <div style="font-size: 0.8rem; font-weight: 500; color: #713f12;">Ensure PostgreSQL connection pooling is tuned for 500+ WS sessions.</div>
+                        </div>
+
+                        <!-- COLLABORATOR CURSOR -->
+                        <div style="position: absolute; top: 290px; left: 700px; pointer-events: none; z-index: 30; display: flex; align-items: center; gap: 0.3rem;">
+                            <i data-lucide="mouse-pointer" style="width:16px;height:16px;color:#10b981;fill:#10b981;"></i>
+                            <span style="background: #10b981; color: #fff; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">Carol</span>
+                        </div>
+
+                        <!-- FLOATING BOTTOM ZOOM CONTROLS -->
+                        <div class="floating-tools-bottom">
+                            <button class="btn btn-icon" title="Zoom Out" aria-label="Zoom Out"><i data-lucide="minus" style="width:16px;height:16px;"></i></button>
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); width: 44px; text-align: center;">100%</span>
+                            <button class="btn btn-icon" title="Zoom In" aria-label="Zoom In"><i data-lucide="plus" style="width:16px;height:16px;"></i></button>
+                            <div class="toolbar-divider"></div>
+                            <button class="btn btn-icon" title="Fit to Screen" aria-label="Fit to Screen"><i data-lucide="maximize-2" style="width:16px;height:16px;"></i></button>
+                        </div>
+
+                    </div>
+
+                </div>

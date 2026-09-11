@@ -141,74 +141,78 @@ public class AuthService {
         }
     }
 
-    @org.springframework.beans.factory.annotation.Value("${google.client-id:YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com}")
+    @org.springframework.beans.factory.annotation.Value("${google.client-id:}")
     private String googleClientId;
+
+    private boolean isGoogleClientIdConfigured() {
+        return googleClientId != null
+                && !googleClientId.isBlank()
+                && !googleClientId.contains("YOUR_GOOGLE")
+                && googleClientId.contains(".apps.googleusercontent.com");
+    }
 
     @Transactional
     public AuthResponse googleLogin(com.example.syncpad.dto.request.GoogleLoginRequest request) {
-        String email = request.getEmail();
-        String name = request.getName();
-        String googleSub = request.getGoogleSub();
+        if (!isGoogleClientIdConfigured()) {
+            throw new InvalidTokenException("Google Sign-In is not configured. Please set GOOGLE_CLIENT_ID environment variable with a valid OAuth 2.0 Client ID.");
+        }
 
-        if (request.getIdToken() != null && !request.getIdToken().isBlank()) {
-            try {
-                com.google.api.client.json.gson.GsonFactory jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance();
-                com.google.api.client.http.javanet.NetHttpTransport transport = new com.google.api.client.http.javanet.NetHttpTransport();
-            if ("google_id_token_demo".equals(request.getIdToken()) || "demo".equalsIgnoreCase(request.getIdToken()) || googleClientId == null || googleClientId.isBlank() || googleClientId.contains("YOUR_GOOGLE_CLIENT_ID")) {
-                // In local/test environment or demo mode where Google OAuth is not configured with Google Cloud Console,
-                // permit simulated Google sign-in with the supplied identity
-                if (email == null || email.isBlank()) {
-                    email = "google.user@syncpad.com";
-                }
-                if (name == null || name.isBlank()) {
-                    name = "Google User";
-                }
-                if (googleSub == null || googleSub.isBlank()) {
-                    googleSub = "google_sub_" + Math.abs(email.hashCode());
-                }
+        if (request.getIdToken() == null || request.getIdToken().isBlank()) {
+            throw new InvalidTokenException("Google ID Token is required for Google authentication");
+        }
+
+        String email = null;
+        String name = null;
+        String googleSub = null;
+
+        try {
+            com.google.api.client.json.gson.GsonFactory jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance();
+            com.google.api.client.http.javanet.NetHttpTransport transport = new com.google.api.client.http.javanet.NetHttpTransport();
+
+            com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier verifier =
+                    new com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier.Builder(transport, jsonFactory)
+                            .setAudience(java.util.Collections.singletonList(googleClientId))
+                            .build();
+
+            com.google.api.client.googleapis.auth.oauth2.GoogleIdToken idToken = verifier.verify(request.getIdToken());
+            if (idToken != null) {
+                com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload = idToken.getPayload();
+                email = payload.getEmail();
+                name = (String) payload.get("name");
+                googleSub = payload.getSubject();
             } else {
-                try {
-                    com.google.api.client.json.gson.GsonFactory jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance();
-                    com.google.api.client.http.javanet.NetHttpTransport transport = new com.google.api.client.http.javanet.NetHttpTransport();
-
-                com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier verifier =
-                        new com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier.Builder(transport, jsonFactory)
-                                .setAudience(java.util.Collections.singletonList(googleClientId))
-                                .build();
-                    com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier verifier =
-                            new com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier.Builder(transport, jsonFactory)
-                                    .setAudience(java.util.Collections.singletonList(googleClientId))
-                                    .build();
-
-                com.google.api.client.googleapis.auth.oauth2.GoogleIdToken idToken = verifier.verify(request.getIdToken());
-                if (idToken != null) {
-                    com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload = idToken.getPayload();
-                    email = payload.getEmail();
-                    name = (String) payload.get("name");
-                    googleSub = payload.getSubject();
-                } else {
-                    throw new InvalidTokenException("Invalid or expired Google ID Token");
-                    com.google.api.client.googleapis.auth.oauth2.GoogleIdToken idToken = verifier.verify(request.getIdToken());
-                    if (idToken != null) {
-                        com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload payload = idToken.getPayload();
-                        email = payload.getEmail();
-                        name = (String) payload.get("name");
-                        googleSub = payload.getSubject();
-                    } else {
-                        throw new InvalidTokenException("Invalid or expired Google ID Token");
+                throw new InvalidTokenException("Invalid or expired Google ID Token");
+            }
+        } catch (InvalidTokenException ite) {
+            throw ite;
+        } catch (Exception e) {
+            // Check if token is a valid OAuth2 Access Token verified by Google
+            boolean verifiedViaTokenInfo = false;
+            try {
+                java.net.http.HttpClient httpClient = java.net.http.HttpClient.newHttpClient();
+                java.net.http.HttpRequest httpReq = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create("https://oauth2.googleapis.com/tokeninfo?access_token=" + java.net.URLEncoder.encode(request.getIdToken(), java.nio.charset.StandardCharsets.UTF_8)))
+                        .GET()
+                        .build();
+                java.net.http.HttpResponse<String> httpRes = httpClient.send(httpReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+                if (httpRes.statusCode() == 200) {
+                    com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(httpRes.body());
+                    String aud = node.has("aud") ? node.get("aud").asText() : (node.has("azp") ? node.get("azp").asText() : "");
+                    if (aud.equals(googleClientId)) {
+                        email = node.has("email") ? node.get("email").asText() : null;
+                        googleSub = node.has("sub") ? node.get("sub").asText() : null;
+                        name = (request.getName() != null && !request.getName().isBlank()) ? request.getName() : email;
+                        verifiedViaTokenInfo = (email != null && !email.isBlank());
                     }
-                } catch (InvalidTokenException ite) {
-                    throw ite;
-                } catch (Exception e) {
-                    throw new InvalidTokenException("Google ID Token verification failed: " + e.getMessage());
                 }
-            } catch (InvalidTokenException ite) {
-                throw ite;
-            } catch (Exception e) {
+            } catch (Exception ex) {
+                // Ignore tokeninfo failure
+            }
+
+            if (!verifiedViaTokenInfo) {
+                if (e instanceof InvalidTokenException ite) throw ite;
                 throw new InvalidTokenException("Google ID Token verification failed: " + e.getMessage());
             }
-        } else {
-            throw new InvalidTokenException("Google ID Token is required for Google authentication");
         }
 
         if (email == null || email.isBlank()) {
@@ -219,7 +223,16 @@ public class AuthService {
         final String finalName = (name != null && !name.isBlank()) ? name : email.split("@")[0];
         final String finalSub = googleSub;
 
-        User user = userRepository.findByEmail(finalEmail).orElseGet(() -> {
+        User user = userRepository.findByEmail(finalEmail).map(existing -> {
+            if (existing.getProvider() == null || "LOCAL".equalsIgnoreCase(existing.getProvider())) {
+                existing.setProvider("GOOGLE");
+                if (finalSub != null && !finalSub.isBlank()) {
+                    existing.setProviderId(finalSub);
+                }
+                return userRepository.save(existing);
+            }
+            return existing;
+        }).orElseGet(() -> {
             User newUser = new User(finalName, finalEmail, passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
             newUser.setProvider("GOOGLE");
             newUser.setProviderId(finalSub);

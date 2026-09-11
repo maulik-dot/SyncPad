@@ -57,16 +57,23 @@ services:
     container_name: syncpad_app
     ports:
       - "127.0.0.1:${APP_PORT:-8083}:8082"
+    volumes:
+      - ./src/main/resources/static:/app/static:ro
+      - ./target:/app/host_target:ro
+    command: sh -c 'if [ -f /app/host_target/syncpad-0.0.1-SNAPSHOT.jar ]; then cp /app/host_target/syncpad-0.0.1-SNAPSHOT.jar /app/app.jar; fi && exec java -jar /app/app.jar'
+    entrypoint: []
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-syncpad_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-syncpad_user}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-syncpad_prod_password_2026_x7k9m}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-9a693dec4fd97abde9a0a22f10174e62f8131097}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
       SPRING_FLYWAY_ENABLED: ${SPRING_FLYWAY_ENABLED:-true}
-      JWT_SECRET: ${JWT_SECRET:-0c28b4fa729f17160fe166b43ac5ac4254a9cb3e6ee91b2b6551d223a137a0b8}
+      JWT_SECRET: ${JWT_SECRET:-0dac6e9cb86c30ad6aabb1010399e5c176496eac40a44705e86fd33f8186bdf3}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost,http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8083}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://syncpad.yourdomain.com,https://localhost,http://localhost:3000,http://localhost:5173,http://localhost:8082,http://localhost:8083}
       SPRING_WEBSOCKET_RELAY_ENABLED: ${SPRING_WEBSOCKET_RELAY_ENABLED:-true}
       SPRING_WEBSOCKET_RELAY_HOST: rabbitmq
       SPRING_WEBSOCKET_RELAY_PORT: 61613
@@ -74,6 +81,7 @@ services:
       SPRING_WEBSOCKET_RELAY_CLIENT_PASSCODE: ${RABBITMQ_PASSWORD:-syncpad_stomp_pass_99x}
       SPRING_WEBSOCKET_RELAY_SYSTEM_LOGIN: ${RABBITMQ_USER:-syncpad}
       SPRING_WEBSOCKET_RELAY_SYSTEM_PASSCODE: ${RABBITMQ_PASSWORD:-syncpad_stomp_pass_99x}
+      SPRING_WEB_RESOURCES_STATIC_LOCATIONS: file:/app/static/,classpath:/static/
     deploy:
       resources:
         limits:

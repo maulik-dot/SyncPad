@@ -1,0 +1,135 @@
+                <div id="trashView" class="hidden" style="flex: 1; overflow-y: auto; padding: 2rem;">
+                    
+                    <!-- INFO BANNER & QUICK ACTIONS -->
+                    <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; color: #ef4444; flex-shrink: 0;">
+                                <i data-lucide="info" style="width: 15px; height: 15px;"></i>
+                            </div>
+                            <span style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">
+                                Items in Trash are automatically purged after <strong style="color: var(--text-primary);">30 days</strong>. You can restore items to their original workspace or permanently delete them now.
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button id="trashRestoreAllBtn" onclick="restoreAllTrashConfirm()" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; display: none;">
+                                <i data-lucide="rotate-ccw" style="width: 13px; height: 13px; margin-right: 0.3rem;"></i>
+                                Restore All
+                            </button>
+                            <button id="emptyTrashBtn" onclick="emptyTrashConfirm()" class="btn btn-outline" style="color: var(--danger); border-color: var(--danger); font-size: 0.78rem; padding: 0.35rem 0.75rem; display: none;">
+                                <i data-lucide="trash-2" style="width: 13px; height: 13px; margin-right: 0.3rem;"></i>
+                                Empty Trash
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SCREEN HEADER -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: #ef4444;">
+                                <i data-lucide="trash-2" style="width: 22px; height: 22px;"></i>
+                            </div>
+                            <div>
+                                <h1 style="font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; line-height: 1.2;">
+                                    Trash
+                                    <span id="trashTotalBadge" class="notif-badge-pill role" style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.1); color: #ef4444;">0 items</span>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CONTROLS TOOLBAR: SEARCH, TYPE FILTERS, SORTING, VIEW TOGGLE -->
+                    <div id="trashToolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; background: var(--bg-card); padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <!-- Search Bar -->
+                        <div style="position: relative; flex: 1; min-width: 200px; max-width: 340px;">
+                            <i data-lucide="search" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            <input type="text" id="trashSearchInput" oninput="onTrashSearchInput()" class="input" placeholder="Search trashed items..." style="padding-left: 2.2rem; padding-right: 1.8rem; font-size: 0.82rem; height: 34px; width: 100%;">
+                            <button id="trashSearchClearBtn" onclick="clearTrashSearch()" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: none; padding: 2px;" title="Clear search">
+                                <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                            </button>
+                        </div>
+
+                        <!-- Type Filters -->
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                            <button id="trashFilterAll" onclick="filterTrashByType('all', this)" class="tab-item active" style="font-size: 0.78rem; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm);">
+                                All (<span id="trashCountAll">0</span>)
+                            </button>
+                            <button id="trashFilterDoc" onclick="filterTrashByType('DOC', this)" class="tab-item" style="font-size: 0.78rem; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm);">
+                                Docs (<span id="trashCountDoc">0</span>)
+                            </button>
+                            <button id="trashFilterBoard" onclick="filterTrashByType('WHITEBOARD', this)" class="tab-item" style="font-size: 0.78rem; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm);">
+                                Boards (<span id="trashCountBoard">0</span>)
+                            </button>
+                        </div>
+
+                        <!-- Sort & View Controls -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="arrow-up-down" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
+                                <select id="trashSortSelect" onchange="onTrashSortChange()" class="input" style="font-size: 0.78rem; height: 34px; padding: 0 0.5rem;">
+                                    <option value="recent">Recently Trashed</option>
+                                    <option value="oldest">Oldest Trashed</option>
+                                    <option value="expiring">Expiring Soonest</option>
+                                    <option value="title">Title (A - Z)</option>
+                                </select>
+                            </div>
+
+                            <!-- View Mode Switcher (Grid vs List) -->
+                            <div style="display: flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden;">
+                                <button id="trashViewGridBtn" onclick="setTrashViewMode('grid')" class="btn btn-icon" style="border-radius: 0; width: 32px; height: 32px; background: var(--bg-hover);" title="Grid View">
+                                    <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i>
+                                </button>
+                                <button id="trashViewListBtn" onclick="setTrashViewMode('list')" class="btn btn-icon" style="border-radius: 0; width: 32px; height: 32px; background: transparent;" title="List View">
+                                    <i data-lucide="list" style="width: 14px; height: 14px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BATCH ACTION BAR -->
+                    <div id="trashBatchBar" style="display: none; align-items: center; justify-content: space-between; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: var(--radius-md); padding: 0.65rem 1rem; margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.85rem;">
+                            <input type="checkbox" id="trashSelectAllCheckbox" onchange="toggleTrashSelectAll(this.checked)" style="cursor: pointer; width: 16px; height: 16px;">
+                            <span id="trashSelectedCountText" style="font-size: 0.84rem; font-weight: 600; color: var(--text-primary);">0 items selected</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button onclick="restoreSelectedTrashConfirm()" class="btn btn-primary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">
+                                <i data-lucide="rotate-ccw" style="width: 13px; height: 13px; margin-right: 0.3rem;"></i>
+                                Restore Selected
+                            </button>
+                            <button onclick="deleteSelectedTrashConfirm()" class="btn btn-outline" style="color: var(--danger); border-color: var(--danger); font-size: 0.78rem; padding: 0.35rem 0.75rem;">
+                                <i data-lucide="trash-2" style="width: 13px; height: 13px; margin-right: 0.3rem;"></i>
+                                Delete Permanently
+                            </button>
+                            <button onclick="clearTrashSelection()" class="btn btn-outline" style="font-size: 0.78rem; padding: 0.35rem 0.6rem;">
+                                Deselect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- TRASH ITEMS CONTAINER: GRID VIEW -->
+                    <div id="trashDocumentsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
+                        <!-- Trashed document cards rendered dynamically -->
+                    </div>
+
+                    <!-- TRASH ITEMS CONTAINER: TABLE VIEW -->
+                    <div id="trashDocumentsTableContainer" style="display: none; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.84rem;">
+                            <thead>
+                                <tr style="background: var(--bg-hover); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                    <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
+                                        <input type="checkbox" id="trashTableHeaderCheckbox" onchange="toggleTrashSelectAll(this.checked)" style="cursor: pointer;">
+                                    </th>
+                                    <th style="padding: 0.75rem 1rem;">Name</th>
+                                    <th style="padding: 0.75rem 1rem; width: 140px;">Type</th>
+                                    <th style="padding: 0.75rem 1rem; width: 160px;">Original Location</th>
+                                    <th style="padding: 0.75rem 1rem; width: 160px;">Date Trashed</th>
+                                    <th style="padding: 0.75rem 1rem; width: 140px;">Retention</th>
+                                    <th style="padding: 0.75rem 1rem; width: 120px; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trashDocumentsTableBody">
+                                <!-- Trashed rows rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>

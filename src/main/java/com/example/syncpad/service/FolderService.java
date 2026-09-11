@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.syncpad.dto.response.PermissionResponse;
+import com.example.syncpad.entity.Document;
 import com.example.syncpad.entity.Folder;
 import com.example.syncpad.entity.FolderPermission;
 import com.example.syncpad.entity.Role;
@@ -24,7 +25,10 @@ import com.example.syncpad.repository.UserRepository;
 import com.example.syncpad.repository.WorkspacePermissionRepository;
 import com.example.syncpad.repository.WorkspaceRepository;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
+@Transactional(readOnly = true)
 public class FolderService {
 
     private final FolderRepository folderRepository;
@@ -32,19 +36,22 @@ public class FolderService {
     private final FolderPermissionRepository folderPermissionRepository;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspacePermissionRepository workspacePermissionRepository;
+    private final com.example.syncpad.repository.DocumentRepository documentRepository;
 
     public FolderService(
             FolderRepository folderRepository,
             UserRepository userRepository,
             FolderPermissionRepository folderPermissionRepository,
             WorkspaceRepository workspaceRepository,
-            WorkspacePermissionRepository workspacePermissionRepository
+            WorkspacePermissionRepository workspacePermissionRepository,
+            com.example.syncpad.repository.DocumentRepository documentRepository
     ) {
         this.folderRepository = folderRepository;
         this.userRepository = userRepository;
         this.folderPermissionRepository = folderPermissionRepository;
         this.workspaceRepository = workspaceRepository;
         this.workspacePermissionRepository = workspacePermissionRepository;
+        this.documentRepository = documentRepository;
     }
 
     public Role getEffectiveRole(Folder folder, User user) {
@@ -76,9 +83,8 @@ public class FolderService {
         // 4. Check Workspace-level permission
         String wsName = folder.getWorkspaceName();
         if (wsName != null && !wsName.isBlank()) {
-            Optional<Workspace> wsOpt = workspaceRepository.findByName(wsName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
+            List<Workspace> wsList = workspaceRepository.findAllByName(wsName.trim());
+            for (Workspace ws : wsList) {
                 if (ws.getOwner() != null && ws.getOwner().getId().equals(user.getId())) {
                     return Role.OWNER;
                 }
@@ -103,9 +109,8 @@ public class FolderService {
         // Workspace owner / admin is folder admin
         String wsName = folder.getWorkspaceName();
         if (wsName != null && !wsName.isBlank()) {
-            Optional<Workspace> wsOpt = workspaceRepository.findByName(wsName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
+            List<Workspace> wsList = workspaceRepository.findAllByName(wsName.trim());
+            for (Workspace ws : wsList) {
                 if (ws.getOwner() != null && ws.getOwner().getId().equals(user.getId())) {
                     return true;
                 }
@@ -138,14 +143,17 @@ public class FolderService {
         }
 
         if (workspaceName != null && !workspaceName.isBlank()) {
-            java.util.Optional<Workspace> wsOpt = workspaceRepository.findByName(workspaceName);
-            if (wsOpt.isPresent()) {
-                Workspace ws = wsOpt.get();
-                boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
-                boolean hasWsPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
-                        .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
-                        .orElse(false);
-                if (!isWsOwner && !hasWsPerm) {
+            String trimmedWs = workspaceName.trim();
+            List<Workspace> wsList = workspaceRepository.findAllByName(trimmedWs);
+            if (!wsList.isEmpty()) {
+                boolean hasWsPerm = wsList.stream().anyMatch(ws -> {
+                    boolean isWsOwner = ws.getOwner() != null && ws.getOwner().getId().equals(owner.getId());
+                    boolean hasPerm = workspacePermissionRepository.findByUserAndWorkspace(owner, ws)
+                            .map(p -> p.getRole() == Role.OWNER || p.getRole() == Role.ADMIN || p.getRole() == Role.EDITOR)
+                            .orElse(false);
+                    return isWsOwner || hasPerm;
+                });
+                if (!hasWsPerm) {
                     throw new PermissionDeniedException("Access restricted: You do not have permission to add folders to this workspace");
                 }
             }
@@ -186,6 +194,26 @@ public class FolderService {
             throw new PermissionDeniedException("Only Folder or Workspace Admin can delete this folder");
         }
 
+        // 1. Recursively delete subfolders first
+        List<Folder> subfolders = folderRepository.findByParentFolderId(folder.getId());
+        for (Folder sub : subfolders) {
+            sub.setParentFolder(null);
+            folderRepository.save(sub);
+            deleteFolder(sub.getId(), userEmail);
+        }
+
+        // 2. Detach any documents directly inside this folder so they safely move to the root workspace level
+        if (documentRepository != null) {
+            List<Document> docsInFolder = documentRepository.findByFolderId(folder.getId());
+            for (Document doc : docsInFolder) {
+                doc.setFolder(null);
+                documentRepository.save(doc);
+            }
+        }
+
+        // 3. Clear parent reference and delete
+        folder.setParentFolder(null);
+        folderRepository.save(folder);
         folderPermissionRepository.deleteByFolder(folder);
         folderRepository.delete(folder);
     }
@@ -196,6 +224,12 @@ public class FolderService {
                 : null;
 
         List<Folder> allWorkspaceFolders = folderRepository.findByWorkspaceName(workspaceName);
+        if (allWorkspaceFolders.isEmpty() && workspaceName != null && !workspaceName.isBlank()) {
+            final String trimmedTarget = workspaceName.trim();
+            allWorkspaceFolders = folderRepository.findAll().stream()
+                    .filter(f -> f.getWorkspaceName() != null && f.getWorkspaceName().trim().equalsIgnoreCase(trimmedTarget))
+                    .collect(Collectors.toList());
+        }
         if (user == null) {
             return allWorkspaceFolders;
         }

@@ -91,7 +91,7 @@ public class DocumentController {
                 request.getWorkspaceName(),
                 authentication.getName()
         );
-        return DocumentResponse.from(doc);
+        return documentService.toResponse(doc, authentication.getName());
     }
 
     @GetMapping
@@ -99,6 +99,8 @@ public class DocumentController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Long folderId,
             @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String workspace,
+            @RequestParam(required = false, defaultValue = "false") boolean rootOnly,
             Authentication authentication
     ) {
         if (tag != null && !tag.trim().isEmpty()) {
@@ -108,9 +110,9 @@ public class DocumentController {
         if (folderId != null) {
             docs = documentService.getDocumentsByFolder(folderId, authentication.getName());
         } else {
-            docs = documentService.getAccessibleDocuments(authentication.getName(), type);
+            docs = documentService.getAccessibleDocuments(authentication.getName(), type, workspace, rootOnly);
         }
-        return docs.stream().map(DocumentResponse::from).collect(Collectors.toList());
+        return documentService.toResponses(docs, authentication.getName());
     }
 
     @GetMapping("/starred")
@@ -126,9 +128,14 @@ public class DocumentController {
         return documentService.searchDocuments(query, authentication.getName());
     }
 
+    @GetMapping("/shared-with-me")
+    public List<DocumentResponse> getSharedWithMeDocuments(Authentication authentication) {
+        return documentService.getSharedWithMeDocuments(authentication.getName());
+    }
+
     @GetMapping("/{id}")
     public DocumentResponse getDocument(@PathVariable Long id, Authentication authentication) {
-        return DocumentResponse.from(documentService.getDocument(id, authentication.getName()));
+        return documentService.toResponse(documentService.getDocument(id, authentication.getName()), authentication.getName());
     }
 
     @GetMapping("/{id}/detail")
@@ -147,7 +154,7 @@ public class DocumentController {
             @Valid @RequestBody RenameDocumentRequest request,
             Authentication authentication
     ) {
-        return DocumentResponse.from(documentService.renameDocument(id, request.getTitle(), authentication.getName()));
+        return documentService.toResponse(documentService.renameDocument(id, request.getTitle(), authentication.getName()), authentication.getName());
     }
 
     @PutMapping("/{id}/rename")
@@ -156,7 +163,7 @@ public class DocumentController {
             @Valid @RequestBody RenameDocumentRequest request,
             Authentication authentication
     ) {
-        return DocumentResponse.from(documentService.renameDocument(id, request.getTitle(), authentication.getName()));
+        return documentService.toResponse(documentService.renameDocument(id, request.getTitle(), authentication.getName()), authentication.getName());
     }
 
     @PutMapping("/{id}")
@@ -165,12 +172,12 @@ public class DocumentController {
             @Valid @RequestBody UpdateDocumentRequest request,
             Authentication authentication
     ) {
-        return DocumentResponse.from(documentService.updateDocument(id, request.getTitle(), request.getContent(), authentication.getName()));
+        return documentService.toResponse(documentService.updateDocument(id, request.getTitle(), request.getContent(), authentication.getName()), authentication.getName());
     }
 
     @PostMapping("/{id}/trash")
     public DocumentResponse trashDocument(@PathVariable Long id, Authentication authentication) {
-        return DocumentResponse.from(documentService.trashDocument(id, authentication.getName()));
+        return documentService.toResponse(documentService.trashDocument(id, authentication.getName()), authentication.getName());
     }
 
     @DeleteMapping("/{id}")
@@ -181,20 +188,18 @@ public class DocumentController {
 
     @GetMapping("/trash")
     public List<DocumentResponse> getTrashedDocuments(Authentication authentication) {
-        return documentService.getTrashedDocuments(authentication.getName())
-                .stream()
-                .map(DocumentResponse::from)
-                .collect(Collectors.toList());
+        return documentService.toResponses(documentService.getTrashedDocuments(authentication.getName()), authentication.getName());
     }
 
     @PostMapping("/{id}/restore-trash")
     public DocumentResponse restoreTrashDocument(@PathVariable Long id, Authentication authentication) {
-        return DocumentResponse.from(documentService.restoreDocument(id, authentication.getName()));
+        return documentService.toResponse(documentService.restoreDocument(id, authentication.getName()), authentication.getName());
     }
 
     @PostMapping("/{id}/restore")
     public DocumentResponse restoreDocument(@PathVariable Long id, Authentication authentication) {
-        return DocumentResponse.from(documentService.restoreDocument(id, authentication.getName()));
+        Document doc = documentService.restoreDocument(id, authentication.getName());
+        return DocumentResponse.from(doc, false);
     }
 
     @DeleteMapping("/{id}/permanent")
@@ -320,6 +325,16 @@ public class DocumentController {
         return documentService.generateShareLink(id, authentication.getName(), request);
     }
 
+    @GetMapping("/{id}/share-link")
+    public ResponseEntity<ShareLinkResponse> getActiveShareLink(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        return documentService.getActiveShareLink(id, authentication.getName())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @GetMapping("/share/{token}")
     public SharedDocumentResponse getDocumentByShareToken(
             @PathVariable String token,
@@ -327,6 +342,14 @@ public class DocumentController {
     ) {
         String email = (authentication != null && authentication.isAuthenticated()) ? authentication.getName() : null;
         return documentService.getDocumentByShareToken(token, email);
+    }
+
+    @PutMapping("/share/{token}")
+    public SharedDocumentResponse updateDocumentByShareToken(
+            @PathVariable String token,
+            @Valid @RequestBody UpdateDocumentRequest request
+    ) {
+        return documentService.updateDocumentByShareToken(token, request);
     }
 
     @PostMapping("/share-link/{token}/revoke")
@@ -388,7 +411,7 @@ public class DocumentController {
             @Valid @RequestBody AttachPdfRequest request,
             Authentication authentication
     ) {
-        return DocumentResponse.from(documentService.attachPdf(id, request.getFileName(), request.getPdfUrl(), authentication.getName()));
+        return documentService.toResponse(documentService.attachPdf(id, request.getFileName(), request.getPdfUrl(), authentication.getName()), authentication.getName());
     }
 
     @DeleteMapping("/{id}/pdf")
@@ -396,7 +419,8 @@ public class DocumentController {
             @PathVariable Long id,
             Authentication authentication
     ) {
-        return DocumentResponse.from(documentService.detachPdf(id, authentication.getName()));
+        Document doc = documentService.detachPdf(id, authentication.getName());
+        return DocumentResponse.from(doc, false);
     }
 
     @GetMapping("/{id}/activity")
@@ -416,5 +440,28 @@ public class DocumentController {
             Authentication authentication
     ) {
         return exportService.exportDocument(id, format, authentication.getName());
+    }
+
+    public static class MentionCollaboratorRequest {
+        private String targetEmail;
+        private Long targetUserId;
+        private String targetName;
+
+        public String getTargetEmail() { return targetEmail; }
+        public void setTargetEmail(String targetEmail) { this.targetEmail = targetEmail; }
+        public Long getTargetUserId() { return targetUserId; }
+        public void setTargetUserId(Long targetUserId) { this.targetUserId = targetUserId; }
+        public String getTargetName() { return targetName; }
+        public void setTargetName(String targetName) { this.targetName = targetName; }
+    }
+
+    @PostMapping("/{id}/mention")
+    public ResponseEntity<Void> mentionCollaborator(
+            @PathVariable Long id,
+            @RequestBody MentionCollaboratorRequest request,
+            Authentication authentication
+    ) {
+        documentService.notifyCollaboratorMention(id, authentication.getName(), request.getTargetEmail(), request.getTargetUserId(), request.getTargetName());
+        return ResponseEntity.ok().build();
     }
 }
