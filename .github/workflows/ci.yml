@@ -12,10 +12,10 @@ concurrency:
 
 jobs:
   # =========================================================================
-  # JOB 1: Backend Unit & Integration Tests (83 Tests)
+  # JOB 1: Backend Unit & Integration Tests (137 Tests)
   # =========================================================================
   backend-test:
-    name: Backend Unit & Integration Tests (83 Tests)
+    name: Backend Unit & Integration Tests (137 Tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -31,7 +31,7 @@ jobs:
       - name: Make Maven Wrapper Executable
         run: chmod +x ./mvnw
 
-      - name: Run Full Maven Test Suite (83 Tests)
+      - name: Run Full Maven Test Suite (137 Tests)
         run: ./mvnw clean test
 
       - name: Upload Surefire Test Reports on Failure
@@ -95,10 +95,10 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
   # =========================================================================
-  # JOB 4: Headless Docker Stack & Live E2E Verification (121 Assertions)
+  # JOB 4: Headless Docker Stack & Live E2E Verification (150 Assertions)
   # =========================================================================
   docker-compose-e2e:
-    name: Docker Stack Build & E2E Verification (121 Assertions)
+    name: Docker Stack Build & E2E Verification (150 Assertions)
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-build]
     steps:

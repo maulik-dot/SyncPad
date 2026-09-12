@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * AWS Secrets Manager provider for AWS ECS / EKS / EC2 deployments.
+ * Resolves secret key-value pairs from the pre-injected AWS_SECRET_PAYLOAD environment JSON
+ * (commonly mounted by AWS Secrets Manager ECS integration or Kubernetes External Secrets Operator).
  */
 public class AwsSecretsManagerProvider implements SecretProvider {
 

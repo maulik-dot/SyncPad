@@ -1,6 +1,7 @@
 global:
   resolve_timeout: 5m
 
+# Alert Routing Configuration
 route:
   group_by: ["alertname", "application", "environment"]
   group_wait: 30s
@@ -13,13 +14,20 @@ route:
       receiver: "critical-alerts"
       repeat_interval: 1h
 
+# Receivers: In production, configure Slack, PagerDuty, Opsgenie, or your notification gateway.
+# Example:
+#   slack_configs:
+#     - channel: '#syncpad-alerts'
+#       api_url: 'https://hooks.slack.com/services/T00/B00/X00'
 receivers:
   - name: "default-receiver"
     webhook_configs:
+      # Configure your alerting endpoint (e.g. https://alerts.yourdomain.com/webhook or Slack/PagerDuty integration)
       - url: "http://127.0.0.1:5001/webhook"
         send_resolved: true
 
   - name: "critical-alerts"
     webhook_configs:
+      # Configure high-priority/paging endpoint (e.g. PagerDuty webhook / Opsgenie)
       - url: "http://127.0.0.1:5001/critical-webhook"
         send_resolved: true

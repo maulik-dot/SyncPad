@@ -27,17 +27,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final ScimAuthenticationFilter scimAuthFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthFilter,
+            ScimAuthenticationFilter scimAuthFilter,
             RateLimitingFilter rateLimitingFilter,
             CustomUserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder
     ) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.scimAuthFilter = scimAuthFilter;
         this.rateLimitingFilter = rateLimitingFilter;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
@@ -54,7 +57,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/auth/**",
-                    "/scim/v2/**",
+                    "/scim/v2/ServiceProviderConfig",
+                    "/scim/v2/Schemas",
                     "/ws/**",
                     "/",
                     "/index.html",
@@ -85,7 +89,8 @@ public class SecurityConfig {
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(scimAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

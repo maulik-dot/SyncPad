@@ -56,6 +56,8 @@ class SsoProvisioningServiceTest {
                 jwtService,
                 passwordEncoder
         );
+        ssoProvisioningService.setSsoEnabled(true);
+        ssoProvisioningService.setSimulationMode(true);
     }
 
     @Test
@@ -140,6 +142,27 @@ class SsoProvisioningServiceTest {
         when(userRepository.findByEmail("ex-employee@company.com")).thenReturn(Optional.of(deactivated));
 
         assertThrows(AccessDeniedException.class, () -> {
+            ssoProvisioningService.processSsoLogin(req);
+        });
+    }
+
+    @Test
+    void testProcessSsoLogin_ssoDisabledThrowsAccessDenied() {
+        ssoProvisioningService.setSsoEnabled(false);
+        SsoLoginRequest req = new SsoLoginRequest("OKTA", "user@company.com", "User");
+
+        assertThrows(AccessDeniedException.class, () -> {
+            ssoProvisioningService.processSsoLogin(req);
+        });
+    }
+
+    @Test
+    void testProcessSsoLogin_unverifiedThrowsBadCredentialsWhenNotSimulation() {
+        ssoProvisioningService.setSsoEnabled(true);
+        ssoProvisioningService.setSimulationMode(false);
+        SsoLoginRequest req = new SsoLoginRequest("OKTA", "user@company.com", "User");
+
+        assertThrows(org.springframework.security.authentication.BadCredentialsException.class, () -> {
             ssoProvisioningService.processSsoLogin(req);
         });
     }

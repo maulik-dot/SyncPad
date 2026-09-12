@@ -74,10 +74,42 @@ public class SsoProvisioningService {
                 ));
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.sso.enabled:false}")
+    private boolean ssoEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${app.sso.simulation-mode:false}")
+    private boolean simulationMode;
+
+    public void setSsoEnabled(boolean ssoEnabled) {
+        this.ssoEnabled = ssoEnabled;
+    }
+
+    public void setSimulationMode(boolean simulationMode) {
+        this.simulationMode = simulationMode;
+    }
+
     @Transactional
     public AuthResponse processSsoLogin(SsoLoginRequest request) {
         String email = request.getEmail().toLowerCase().trim();
         String domain = email.contains("@") ? email.substring(email.indexOf("@") + 1) : "enterprise.com";
+
+        if (!ssoEnabled) {
+            log.warn("Rejected Enterprise SSO login: SSO is disabled on this server. user={}", email);
+            throw new AccessDeniedException("Enterprise Single Sign-On is disabled on this server.");
+        }
+
+        if (!simulationMode) {
+            boolean hasIdToken = request.getIdToken() != null && !request.getIdToken().isBlank();
+            boolean hasAssertion = request.getAssertion() != null && !request.getAssertion().isBlank();
+            if (!hasIdToken && !hasAssertion) {
+                log.warn("Rejected Enterprise SSO login: Missing cryptographic assertion or ID token for user={}", email);
+                throw new org.springframework.security.authentication.BadCredentialsException(
+                        "Cryptographic identity assertion or ID token is required for Enterprise SSO."
+                );
+            }
+        } else {
+            log.warn("SECURITY NOTICE: Processing Enterprise SSO login in SIMULATION MODE for user={}. Do not use in production.", email);
+        }
 
         log.info("Processing Enterprise SSO authentication for user={}, provider={}", email, request.getProvider());
 

@@ -201,7 +201,8 @@ public class AiAssistantService {
 
         String contextPrompt = buildPrompt(request, docContext);
         String generatedContent;
-        String modelName = "SyncPad Contextual Synthesis";
+        String modelName = "SyncPad Local Template Synthesis (Offline Fallback)";
+        boolean isFallback = false;
 
         try {
             if (hasValidGeminiKey()) {
@@ -213,9 +214,13 @@ public class AiAssistantService {
                     log.warn("Gemini API call failed (all fallbacks), gracefully falling back to internal synthesis: {}", e.getMessage());
                     recordFallback("gemini-all", "offline");
                     generatedContent = generateOfflineResponse(request, docContext);
+                    modelName = "SyncPad Local Template Synthesis (Offline Fallback)";
+                    isFallback = true;
                 }
             } else {
                 generatedContent = generateOfflineResponse(request, docContext);
+                modelName = "SyncPad Local Template Synthesis (Offline Fallback)";
+                isFallback = true;
             }
 
             long latency = System.currentTimeMillis() - startTime;
@@ -225,7 +230,7 @@ public class AiAssistantService {
             recordAuditLog(user, document, request, modelName, estimatedTokens, latency, false);
             recordSuccessMetrics(request.getAction(), modelName, "sync", latency, estimatedTokens);
 
-            return new AiGenerateResponse(generatedContent, request.getAction(), modelName, estimatedTokens, latency);
+            return new AiGenerateResponse(generatedContent, request.getAction(), modelName, estimatedTokens, latency, isFallback);
         } catch (Exception e) {
             recordErrorMetrics(request.getAction(), "sync");
             throw e;
@@ -233,8 +238,8 @@ public class AiAssistantService {
     }
 
     public SseEmitter streamGenerate(AiGenerateRequest request, String userEmail) {
+        SseEmitter emitter = new SseEmitter(120_000L);
         long startTime = System.currentTimeMillis();
-        SseEmitter emitter = new SseEmitter(300_000L);
         User user = getUserByEmail(userEmail);
         Document document = resolveDocumentIfAuthorized(request.getDocumentId(), user);
         String docContext = extractDocumentContext(document);
@@ -242,7 +247,7 @@ public class AiAssistantService {
         streamingExecutor.submit(() -> {
             try {
                 String fullResponse = null;
-                String modelUsed = "SyncPad Contextual Synthesis";
+                String modelUsed = "SyncPad Local Template Synthesis (Offline Fallback)";
 
                 if (hasValidGeminiKey()) {
                     try {
@@ -257,6 +262,7 @@ public class AiAssistantService {
 
                 if (fullResponse == null) {
                     fullResponse = generateOfflineResponse(request, docContext);
+                    modelUsed = "SyncPad Local Template Synthesis (Offline Fallback)";
                     streamTextChunked(fullResponse, emitter);
                 }
 

@@ -44,7 +44,10 @@ public class AiController {
             @Valid @RequestBody AiGenerateRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(aiAssistantService.generate(request, authentication.getName()));
+        AiGenerateResponse response = aiAssistantService.generate(request, authentication.getName());
+        return ResponseEntity.ok()
+                .header("X-AI-Fallback", String.valueOf(response.isFallback()))
+                .body(response);
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

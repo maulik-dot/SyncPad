@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * GCP Secret Manager provider for Google Cloud deployments.
+ * Resolves secret key-value pairs from the pre-injected GCP_SECRET_PAYLOAD environment JSON
+ * (commonly mounted by Cloud Run secret volumes or GKE External Secrets Operator).
  */
 public class GcpSecretManagerProvider implements SecretProvider {
 
